@@ -2,7 +2,7 @@
 
 import pytest
 
-from python_template.greeting import greet
+from tirol_hackathon_bernard_gruppe.greeting import greet
 
 
 def test_greet_returns_message_with_name() -> None:

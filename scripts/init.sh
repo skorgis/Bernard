@@ -18,14 +18,28 @@ fi
 old_pkg_path="${pkg_dirs[0]}"
 old_pkg_name="$(basename "$old_pkg_path")"
 
-read -rp "New project name (e.g. 'My Cool Project'): " project_name
+# Prompt until the answer is valid UTF-8. `-e` enables readline so Backspace
+# removes whole characters instead of leaving stray bytes of multibyte ones.
+prompt() {
+    local message="$1" var_name="$2" answer
+    while true; do
+        read -erp "$message" answer
+        if printf '%s' "$answer" | python3 -c 'import sys; sys.stdin.buffer.read().decode("utf-8")' 2>/dev/null; then
+            printf -v "$var_name" '%s' "$answer"
+            return
+        fi
+        echo "Input contains invalid characters (not UTF-8), please try again." >&2
+    done
+}
+
+prompt "New project name (e.g. 'My Cool Project'): " project_name
 if [ -z "$project_name" ]; then
     echo "Project name cannot be empty." >&2
     exit 1
 fi
-read -rp "Description (default: \"\"): " description
-read -rp "Author name (default: \"\"): " author_name
-read -rp "Author email (default: \"\"): " author_email
+prompt "Description (default: \"\"): " description
+prompt "Author name (default: \"\"): " author_name
+prompt "Author email (default: \"\"): " author_email
 
 dist_name="$(echo "$project_name" | tr '[:upper:]' '[:lower:]' | tr -s ' _' '-' | tr -cd 'a-z0-9-')"
 pkg_name="$(echo "$project_name" | tr '[:upper:]' '[:lower:]' | tr -s ' -' '_' | tr -cd 'a-z0-9_')"
@@ -106,7 +120,11 @@ text = re.sub(
     count=1,
 )
 
-open(path, "w", encoding="utf-8").write(text)
+# Write to a temp file and swap it in, so a failure never leaves pyproject.toml truncated.
+tmp_path = path + ".tmp"
+with open(tmp_path, "w", encoding="utf-8") as f:
+    f.write(text)
+os.replace(tmp_path, path)
 PYEOF
 
 echo "==> Updating $RUFF_TOML"

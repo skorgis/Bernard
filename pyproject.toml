@@ -1,14 +1,16 @@
 [project]
-name = "python-template"
+name = "tirol-hackathon-bernard-gruppe"
 version = "0.1.0"
-description = ""
-authors = [
-    {name = "christoph meyer",email = "christoph.meyer@bernard-gruppe.com"}
-]
+description = "This Project is a Project Starter for the hackathon bernard gruppe"
+authors = [{name = "Christoph Meyer",email = "christoph.meyer@bernard-gruppe.com"}]
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "paho-mqtt>=2.1.0",
 ]
+
+[project.scripts]
+detection-worker = "detection_worker.cli:main"
 
 [dependency-groups]
 dev = [
@@ -18,7 +20,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/python_template"]
+packages = ["src/tirol_hackathon_bernard_gruppe", "src/detection_worker"]
 
 [tool.pyright]
 include = ["src", "tests", "main.py"]

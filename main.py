@@ -2,7 +2,7 @@
 
 import argparse
 
-from python_template.greeting import greet
+from tirol_hackathon_bernard_gruppe.greeting import greet
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
