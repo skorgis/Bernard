@@ -8,6 +8,7 @@ only allows one live connection per client id in the first place.
 """
 
 import logging
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -134,6 +135,10 @@ class MultiSiteCorrelatedService:
         """
         self._client = client
         self._dispatcher = dispatcher or EventDispatcher()
+        # Guards the site/topic/correlator tables: `reload` is typically
+        # called from another thread than paho's network thread, which runs
+        # every other entry point. Re-entrant so a callback may `reload`.
+        self._lock = threading.RLock()
         self._on_pair = on_pair or self._log_pair
         self._on_unmatched = on_unmatched or self._log_unmatched
         self._on_jam = on_jam or self._log_jam
@@ -152,7 +157,7 @@ class MultiSiteCorrelatedService:
     def reload(self, sites: list[Site]) -> None:
         """Add/update/remove sites to match `sites`, in place.
 
-        See the "Many sites" section of detection_worker/README.md.
+        See detection_worker/ARCHITECTURE.md § Site config reload.
         `Site` is a plain `@dataclass`, so this is just `==`: a site
         that's unchanged (same name, same field values) is left
         completely alone — its `EventCorrelator` and any pending/
@@ -161,21 +166,25 @@ class MultiSiteCorrelatedService:
         (if it existed before) and re-registered from scratch — there's
         no partial update of a single field. A site that's gone is just
         unsubscribed and dropped.
+
+        Safe to call from any thread: it waits for a message that's being
+        handled to finish, and messages wait for it.
         """
-        new_by_name = {site.name: site for site in sites}
-        old_names = set(self._sites)
-        new_names = set(new_by_name)
+        with self._lock:
+            new_by_name = {site.name: site for site in sites}
+            old_names = set(self._sites)
+            new_names = set(new_by_name)
 
-        for name in old_names - new_names:
-            self._unregister_site(name)
-
-        for name in old_names & new_names:
-            if new_by_name[name] != self._sites[name]:
+            for name in old_names - new_names:
                 self._unregister_site(name)
-                self._register_site(new_by_name[name])
 
-        for name in new_names - old_names:
-            self._register_site(new_by_name[name])
+            for name in old_names & new_names:
+                if new_by_name[name] != self._sites[name]:
+                    self._unregister_site(name)
+                    self._register_site(new_by_name[name])
+
+            for name in new_names - old_names:
+                self._register_site(new_by_name[name])
 
     def _register_site(self, site: Site) -> None:
         self._sites[site.name] = site
@@ -247,18 +256,24 @@ class MultiSiteCorrelatedService:
         if rc != 0:
             logger.error("connection failed (rc=%s)", rc)
             return
-        self._connected = True
-        for topic in set(self._topics) | self._dispatcher.topics:
-            self._client.subscribe(topic)
+        with self._lock:
+            self._connected = True
+            for topic in set(self._topics) | self._dispatcher.topics:
+                self._client.subscribe(topic)
 
     def _handle_disconnect(self, rc: int) -> None:
-        self._connected = False
+        with self._lock:
+            self._connected = False
         if rc != 0:
             logger.warning(
                 "unexpectedly disconnected (rc=%s); reconnecting", rc
             )
 
     def _handle_message(self, topic: str, payload: bytes) -> None:
+        with self._lock:
+            self._handle_message_locked(topic, payload)
+
+    def _handle_message_locked(self, topic: str, payload: bytes) -> None:
         site_topic = topic in self._topics
         if not site_topic and topic not in self._dispatcher.topics:
             raise ValueError(f"message on unexpected topic: {topic!r}")
