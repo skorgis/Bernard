@@ -24,7 +24,7 @@ indent-style = "space"
 line-ending = "auto"
 
 [lint.isort]
-known-first-party = ["tirol_hackathon_bernard_gruppe", "detection_worker"]
+known-first-party = ["tirol_hackathon_bernard_gruppe", "detection_worker", "picture_pipeline"]
 
 [lint.per-file-ignores]
 "__init__.py" = ["D104"]

@@ -6,6 +6,8 @@ authors = [{name = "Christoph Meyer",email = "christoph.meyer@bernard-gruppe.com
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "numpy>=2.5.3",
+    "opencv-contrib-python>=5.0.0.93",
     "paho-mqtt>=2.1.0",
 ]
 
@@ -20,10 +22,10 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/tirol_hackathon_bernard_gruppe", "src/detection_worker"]
+packages = ["src/tirol_hackathon_bernard_gruppe", "src/detection_worker", "src/picture_pipeline"]
 
 [tool.pyright]
-include = ["src", "tests", "main.py"]
+include = ["src", "tests", "examples", "main.py"]
 typeCheckingMode = "standard"
 
 [build-system]

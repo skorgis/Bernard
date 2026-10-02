@@ -11,6 +11,9 @@ both devices, each one emits an event a few hundred milliseconds apart.
 events whose timestamps fall within a configurable tolerance. It reports
 everything that cannot be paired as *unmatched*.
 
+For the design (layers, message flow, correlation algorithm, threading
+model), see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Package layout
 
 | Module | Responsibility |
@@ -292,9 +295,13 @@ print(event.crossingLineEvent.lineName, extract_timestamp(event))
   `0 <= trailing - leading <= tolerance`. With `symmetric=True` the window is
   `-tolerance <= delay <= tolerance` instead.
 - **Eviction is driven by event time.** A pending event is reported as
-  unmatched only once the *other* source's newest timestamp proves it can no
-  longer match. If one source goes silent, its counterpart's pending events
-  stay pending until that source sends again.
+  unmatched once the *other* source's newest timestamp proves it can no longer
+  match.
+- **Buffers are bounded.** If one device goes silent, the other device's
+  pending events are still reported as unmatched once they're more than
+  `max_pending_age` (default 5 min) older than its own newest event.
+  `max_pending` (default 10,000) caps each buffer. Pass either to
+  `EventCorrelator`, or `None` to disable it.
 - **`symmetric` is a trade-off.** It tolerates devices whose reported order
   jitters by a few milliseconds. It also makes it more likely that two
   different vehicles get paired when one device misses a reading. Enable it
