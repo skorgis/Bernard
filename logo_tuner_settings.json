@@ -1,0 +1,20 @@
+{
+  "detector": "sift",
+  "matcher": "brute_force",
+  "max_features": 3000,
+  "ratio": 0.75,
+  "min_good_matches": 10,
+  "min_inliers": 8,
+  "ransac_threshold": 5.0,
+  "max_side_ratio": 2.0,
+  "frame_max_side": 0,
+  "frame_blur": 0,
+  "clahe": true,
+  "clahe_clip_limit": 2.0,
+  "logo_max_side": 0,
+  "logo_blur": 0,
+  "high_pass": 0,
+  "canny": false,
+  "canny_low": 50.0,
+  "canny_high": 150.0
+}
