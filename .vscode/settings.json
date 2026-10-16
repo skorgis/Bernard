@@ -10,5 +10,6 @@
     },
     "[python]": {
         "editor.defaultFormatter": "charliermarsh.ruff"
-    }
+    },
+    "cmake.sourceDirectory": "/home/cmeyer/PycharmProjects/Tirol-Hackathon/vendor/libbmcserial"
 }
