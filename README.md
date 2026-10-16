@@ -329,6 +329,11 @@ Und natürlich: **Fragt uns!** Wir sind den ganzen Hackathon über vor Ort.
   und [src/picture_pipeline/ARCHITECTURE.md](src/picture_pipeline/ARCHITECTURE.md)
 - **Projektvorlage und Werkzeugwahl:** [doc/template.md](doc/template.md)
 
+## Für Betreuer
+
+BMA per LAN erreichen, Firewall-Freigaben und Kamerabild auf einen Test-PC
+holen: [doc/bma-betreuer.md](doc/bma-betreuer.md).
+
 ## Links
 
 - BERNARD-Dokumentation: <https://docs.bernard-gruppe.com/>
