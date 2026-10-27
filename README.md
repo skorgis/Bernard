@@ -246,6 +246,17 @@ Ideen für die Anzeige:
 - „Besetzt“, wenn alles voll ist
 - Ein Rollstuhl-Symbol, wenn das Auto zum Behindertenparkplatz geleitet wird
 
+## LEDs schalten
+
+Am Parkplatz hängen LEDs, die euer Programm per MQTT schalten kann, zum
+Beispiel als Richtungsanzeige. Wie die Nachrichten aussehen und wie ihr auf
+Events reagiert, steht in [`doc/leds-per-mqtt.md`](doc/leds-per-mqtt.md).
+Schnelltest:
+
+```bash
+uv run python examples/bmc_mqtt_switch.py --team team-1 --contact 3 --on
+```
+
 ## Bonus: Symbole erkennen
 
 Mit `picture_pipeline` findet ihr Logos und Symbole im Bild einer Webcam.

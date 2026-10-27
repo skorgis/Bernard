@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/bmc-interface.iml" filepath="$PROJECT_DIR$/.idea/bmc-interface.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/tirol-hackathon-bernard-gruppe.iml" filepath="$PROJECT_DIR$/.idea/tirol-hackathon-bernard-gruppe.iml" />
     </modules>
   </component>

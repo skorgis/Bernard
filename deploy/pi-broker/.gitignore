@@ -1,0 +1,4 @@
+# Broker credentials (hashed, but still secret) and runtime state.
+config/passwd
+data/
+log/

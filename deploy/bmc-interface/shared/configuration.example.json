@@ -1,0 +1,39 @@
+{
+    "version": "0.0.0",
+    "log_level": "INFO",
+    "hardware_simulated": false,
+    "healthcheck_output": 11,
+    "status_output": 12,
+    "max_signal_delay_s": 5,
+    "max_spam_time_s": 300,
+    "max_message_within_spam_time": 600,
+    "max_pulse_duration_s": 300.0,
+    "max_ping_retries": 3,
+    "publisher_intervall_s": 3600,
+    "config_intervall_s": 600,
+    "alert_monitor_targets": "",
+    "alert_monitor_url": "",
+    "alert_monitor_hostname": "bmc-interface-tirol-hackathon",
+    "alert_monitor_project": "Tirol Hackathon",
+    "subscriber": {
+        "host": "169.254.42.3",
+        "port": 1883,
+        "topic": "bmc_interface/tirol-hackathon/out",
+        "use_tls": false,
+        "username": "hackathon",
+        "password": "<MQTT_PASSWORD>",
+        "tls_path": "",
+        "qos": 1
+    },
+    "publisher": {
+        "host": "169.254.42.3",
+        "port": 1883,
+        "topic": "bmc_interface/tirol-hackathon/in",
+        "events_topic": "bmc_interface/tirol-hackathon/events",
+        "use_tls": false,
+        "username": "hackathon",
+        "password": "<MQTT_PASSWORD>",
+        "tls_path": "",
+        "qos": 1
+    }
+}
