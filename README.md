@@ -246,6 +246,17 @@ Ideen für die Anzeige:
 - „Besetzt“, wenn alles voll ist
 - Ein Rollstuhl-Symbol, wenn das Auto zum Behindertenparkplatz geleitet wird
 
+## LEDs schalten
+
+Am Parkplatz hängen LEDs, die euer Programm per MQTT schalten kann, zum
+Beispiel als Richtungsanzeige. Wie die Nachrichten aussehen und wie ihr auf
+Events reagiert, steht in [`doc/leds-per-mqtt.md`](doc/leds-per-mqtt.md).
+Schnelltest:
+
+```bash
+uv run python examples/bmc_mqtt_switch.py --team team-1 --contact 3 --on
+```
+
 ## Bonus: Symbole erkennen
 
 Mit `picture_pipeline` findet ihr Logos und Symbole im Bild einer Webcam.
@@ -328,6 +339,11 @@ Und natürlich: **Fragt uns!** Wir sind den ganzen Hackathon über vor Ort.
 - **Architektur:** [src/detection_worker/ARCHITECTURE.md](src/detection_worker/ARCHITECTURE.md)
   und [src/picture_pipeline/ARCHITECTURE.md](src/picture_pipeline/ARCHITECTURE.md)
 - **Projektvorlage und Werkzeugwahl:** [doc/template.md](doc/template.md)
+
+## Für Betreuer
+
+BMA per LAN erreichen, Firewall-Freigaben und Kamerabild auf einen Test-PC
+holen: [doc/bma-betreuer.md](doc/bma-betreuer.md).
 
 ## Links
 

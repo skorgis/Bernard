@@ -1,0 +1,6 @@
+# Real configuration contains broker credentials.
+shared/configuration.json
+shared/.env
+# Runtime logs written by bmc-interface into the mounted shared/ directory.
+shared/*.csv
+shared/*.log

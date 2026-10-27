@@ -1,0 +1,14 @@
+# MQTT broker on the hackathon Raspberry Pi (hackathon.local).
+# Reachable via WLAN (participants) and via eth0 169.254.42.3 (BMA cable).
+services:
+  mosquitto:
+    # Pinned: `latest` could silently pull a new major version on `pull`.
+    image: eclipse-mosquitto:2.0.21
+    container_name: mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./config:/mosquitto/config
+      - ./data:/mosquitto/data
+      - ./log:/mosquitto/log
