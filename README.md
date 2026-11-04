@@ -361,26 +361,23 @@ Mit `picture_pipeline` findet ihr Logos und Symbole im Bild einer Webcam.
 1. Legt ein Bild des Symbols (z. B. Rollstuhl-Kennzeichen) in den Ordner
    `logos/`. Der Dateiname wird zum Namen des Logos, zum Beispiel
    `logos/rollstuhl.png`.
-2. Startet die Oberfläche zum Ausprobieren:
+2. Startet das Beispiel mit der Webcam (`--source 2` für Webcam Nummer 2):
 
    ```bash
    uv run python examples/logo_webcam.py
    ```
 
-   Wählt oben rechts die Kamera aus und haltet ein Auto mit Symbol davor.
-   Mit den Reglern stellt ihr die Erkennung ein. **Einstellungen speichern**
-   schreibt sie nach `logo_tuner_settings.json` und gibt den passenden
-   Python-Code aus.
+   Haltet ein Auto mit Symbol vor die Kamera. Mit den Schiebereglern stellt
+   ihr die Erkennung ein. Die Taste **s** gibt die passende Zeile für euer
+   Programm aus, **q** beendet.
 3. Im eigenen Programm:
 
    ```python
-   from picture_pipeline.logo_loading import load_logos
-   from picture_pipeline.tuning import TuningSettings
+   from picture_pipeline.logo_finder import LogoFinder, load_logos
 
-   logos = load_logos("logos")
-   pipeline = TuningSettings.load("logo_tuner_settings.json").build_pipeline(logos)
-   analysis = pipeline.analyze(frame)  # frame: ein Kamerabild von OpenCV
-   if analysis.results["rollstuhl"].found:
+   finder = LogoFinder(load_logos("logos"))
+   found = finder.find(frame)  # frame: ein Kamerabild von OpenCV
+   if found["rollstuhl"] is not None:
        print("Rollstuhl-Symbol erkannt!")
    ```
 
@@ -436,7 +433,6 @@ Und natürlich: **Fragt uns!** Wir sind den ganzen Hackathon über vor Ort.
 - **Code formatieren und prüfen:** `uv run ruff format .` und `uv run ruff check .`
 - **Typen prüfen:** `uv run pyright`
 - **Architektur:** [src/detection_worker/ARCHITECTURE.md](src/detection_worker/ARCHITECTURE.md)
-  und [src/picture_pipeline/ARCHITECTURE.md](src/picture_pipeline/ARCHITECTURE.md)
 - **Projektvorlage und Werkzeugwahl:** [doc/template.md](doc/template.md)
 
 ## Für Betreuer

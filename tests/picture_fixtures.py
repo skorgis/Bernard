@@ -4,14 +4,17 @@ import cv2
 import numpy as np
 import numpy.typing as npt
 
-from picture_pipeline.image import Image
+from picture_pipeline.logo_finder import Image
 
 FRAME_SHAPE = (480, 640)
 
 
-def make_logo(size: int = 160) -> Image:
-    """A textured, asymmetric symbol with plenty of corners to detect."""
-    rng = np.random.default_rng(7)
+def make_logo(size: int = 160, seed: int = 7) -> Image:
+    """A textured, asymmetric symbol with plenty of corners to detect.
+
+    Different seeds give different symbols.
+    """
+    rng = np.random.default_rng(seed)
     logo = np.full((size, size, 3), 255, dtype=np.uint8)
     for _ in range(25):
         color = tuple(int(c) for c in rng.integers(0, 200, 3))
