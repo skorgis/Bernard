@@ -68,6 +68,22 @@ class ParkingLot:
         best = max(Side, key=lambda side: free_by_side[side])
         return best if free_by_side[best] > 0 else None
 
+    def recommend(self) -> ParkingSpace | None:
+        """First free space, in configured order, on the best side."""
+        side = self.best_side()
+        if side is None:
+            return None
+        # dicts keep insertion order, i.e. the order of the configuration.
+        return next(
+            space
+            for space in self._spaces.values()
+            if space.side is side and self.is_free(space.roi_name)
+        )
+
+    def is_free(self, roi_name: str) -> bool:
+        """Whether the space was reported vacant; unknown is not free."""
+        return self._occupied.get(roi_name) is False
+
     def _free_by_side(self) -> dict[Side, int]:
         free = dict.fromkeys(Side, 0)
         for name, occupied in self._occupied.items():

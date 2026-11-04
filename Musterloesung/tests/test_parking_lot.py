@@ -66,6 +66,30 @@ def test_best_side_is_none_when_everything_is_occupied() -> None:
     assert lot.best_side() is None
 
 
+def test_recommend_is_first_free_space_on_best_side() -> None:
+    lot = make_lot()
+    lot.update("P1", occupied=True)
+    lot.update("P2", occupied=False)
+    lot.update("P3", occupied=False)
+
+    assert lot.recommend() == LEFT_2
+
+
+def test_recommend_follows_configured_order() -> None:
+    lot = make_lot()
+    lot.update("P2", occupied=False)
+    lot.update("P1", occupied=False)
+
+    assert lot.recommend() == LEFT_1
+
+
+def test_recommend_is_none_without_free_space() -> None:
+    lot = make_lot()
+    lot.update("P1", occupied=True)
+
+    assert lot.recommend() is None
+
+
 def test_update_of_unknown_space_raises() -> None:
     with pytest.raises(UnknownSpaceError):
         make_lot().update("P99", occupied=True)

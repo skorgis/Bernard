@@ -73,3 +73,30 @@ def test_led_contact_must_be_1_to_10(tmp_path: Path) -> None:
 def test_typos_are_rejected(tmp_path: Path) -> None:
     with pytest.raises(ValidationError, match="line_nme"):
         load_config(write(tmp_path, MINIMAL.replace("line_name", "line_nme")))
+
+
+def test_sign_is_enabled_unless_switched_off(tmp_path: Path) -> None:
+    default = load_config(write(tmp_path, MINIMAL))
+    switched_off = load_config(
+        write(tmp_path, MINIMAL + "\n[display]\nenabled = false\n")
+    )
+
+    assert default.display.enabled is True
+    assert switched_off.display.enabled is False
+
+
+def test_leds_light_up_for_occupied_spaces_by_default(
+    tmp_path: Path,
+) -> None:
+    default = load_config(write(tmp_path, MINIMAL))
+    green = load_config(
+        write(
+            tmp_path,
+            MINIMAL.replace(
+                'team = "team-x"', 'team = "team-x"\nlit_when = "free"'
+            ),
+        )
+    )
+
+    assert default.leds.lit_when == "occupied"
+    assert green.leds.lit_when == "free"

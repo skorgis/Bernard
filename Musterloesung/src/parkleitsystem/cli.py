@@ -17,8 +17,9 @@ from parkleitsystem.config import AppConfig, DisplaySettings, load_config
 from parkleitsystem.domain import ParkingLot
 from parkleitsystem.events import register_handlers
 from parkleitsystem.guide import ParkingGuide
+from parkleitsystem.main_loop import run_main_loop
 from parkleitsystem.mqtt_gateway import MqttGateway
-from parkleitsystem.sign import run_sign
+from parkleitsystem.sign import Sign
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,7 @@ def run(
         ParkingLot(config.parking_spaces()),
         gateway,
         guidance_s=config.entry.guidance_seconds,
+        lit_when_free=config.leds.lit_when == "free",
     )
     register_handlers(
         dispatcher,
@@ -69,15 +71,17 @@ def run(
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda _signum, _frame: stop.set())
     with _open_sign(config.display, preview) as display, gateway:
+        sign = Sign(display) if display is not None else None
         try:
-            run_sign(guide, display, wait=stop.wait)
+            run_main_loop(guide, sign, wait=stop.wait)
         except KeyboardInterrupt:
             logger.info("stopped")
 
 
 def _open_sign(
     settings: DisplaySettings, preview: Path | None
-) -> AbstractContextManager[Display]:
+) -> AbstractContextManager[Display | None]:
+    """Open the TFT, the PNG preview, or nothing if no sign is installed."""
     tft = TftConfig(
         rotation=settings.rotation,
         x_offset=settings.x_offset,
@@ -87,6 +91,9 @@ def _open_sign(
     )
     if preview is not None:
         return nullcontext(PngPreview(preview, size=tft.size))
+    if not settings.enabled:
+        logger.info("no sign installed ([display] enabled = false)")
+        return nullcontext(None)
     return open_tft(tft)
 
 

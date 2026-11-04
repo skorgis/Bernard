@@ -13,6 +13,7 @@ event_topic = "bma/events"
 topic = "bmc_interface/tirol-hackathon/out"
 bma_id = "f6b51cd4-4469-4138-831a-b5cc471f9e45"   # BMA G-A2610-0007
 team = "musterloesung"      # source_uuid; spam limit counts per team
+lit_when = "free"           # green LEDs: on while free; "occupied" = on while taken
 
 [entry]
 line_name = "Einfahrt"      # crossing line at the entry
@@ -21,22 +22,26 @@ guidance_seconds = 10       # how long the arrow stays after a car enters
 vehicle_classes = []        # e.g. ["car"]; empty = every detected class
 
 [display]
+enabled = false             # no TFT sign installed yet; LEDs work without it
 rotation = 0                # 0 = landscape 160x128; 180 if mounted upside down
 x_offset = 0                # shift if a coloured line shows at one edge
 y_offset = 0
 bgr = false                 # true if red and blue are swapped
 invert = false
 
-# One block per parking space: BMA zone (roiName), side seen from the
-# entry sign, and the BMC contact (1-10) of its LED.
+# One block per parking space: BMA zone (roiName), side seen from a car
+# crossing the entry line, and the BMC contact (1-10) of its LED. Within a
+# side, the first free space in this order is recommended (blinks), so each
+# row is listed starting next to the entry.
+# P1-P5: front row, on the driver's right.
 [[spaces]]
 roi_name = "P1"
-side = "left"
+side = "right"
 led_contact = 1
 
 [[spaces]]
 roi_name = "P2"
-side = "left"
+side = "right"
 led_contact = 2
 
 [[spaces]]
@@ -48,3 +53,35 @@ led_contact = 3
 roi_name = "P4"
 side = "right"
 led_contact = 4
+
+[[spaces]]
+roi_name = "P5"
+side = "right"
+led_contact = 5
+
+# P6-P10: back row, on the driver's left. Its LEDs are wired in
+# reverse: contact 6 is behind P10, contact 10 behind P6.
+[[spaces]]
+roi_name = "P6"
+side = "left"
+led_contact = 10
+
+[[spaces]]
+roi_name = "P7"
+side = "left"
+led_contact = 9
+
+[[spaces]]
+roi_name = "P8"
+side = "left"
+led_contact = 8
+
+[[spaces]]
+roi_name = "P9"
+side = "left"
+led_contact = 7
+
+[[spaces]]
+roi_name = "P10"
+side = "left"
+led_contact = 6

@@ -4,7 +4,13 @@ Eine mögliche Lösung der Hackathon-Challenge. Fährt ein Auto über die
 Einfahrt-Linie, zeigt das Schild an der Einfahrt einen **Pfeil nach links oder
 rechts**, zur Seite mit den meisten freien Plätzen, und darunter, **wie viele
 Plätze frei** sind. Ist kein Platz frei, zeigt es ein **rotes X**. Jeder
-Parkplatz hat eine **LED**, die leuchtet, solange er belegt ist.
+Parkplatz hat eine **LED**, die leuchtet, solange er belegt ist. Fährt ein
+Auto ein, **blinkt die LED des empfohlenen Platzes**, bis das Auto dort steht
+oder die Führungszeit (`guidance_seconds`) vorbei ist.
+
+Ohne Schild (`[display] enabled = false`) laufen nur die LEDs; so ist der
+Aufbau im Moment konfiguriert. Betrieb als Docker-Container auf dem Pi:
+[deploy/parkleitsystem](../deploy/parkleitsystem/README.md).
 
 | Ruhe | Auto fährt ein | Auto fährt ein | Kein Platz frei |
 | --- | --- | --- | --- |
@@ -131,9 +137,9 @@ mosquitto_sub -h hackathon.local -u "$MQTT_USER" -P "$MQTT_PASSWORD" \
 | Abschnitt | Wichtig |
 | --- | --- |
 | `[entry]` | `line_name`: Name der Einfahrt-Linie (`lineName`); `guidance_seconds`: wie lange der Pfeil stehen bleibt; `vehicle_classes`: z. B. `["car"]`, damit eine Hand auf der Linie keinen Pfeil auslöst |
-| `[[spaces]]` | ein Block pro Parkplatz: `roi_name` (Zone im BMA), `side` (`"left"`/`"right"`, vom Schild aus gesehen), `led_contact` (1–10) |
+| `[[spaces]]` | ein Block pro Parkplatz: `roi_name` (Zone im BMA), `side` (`"left"`/`"right"`, aus Sicht des einfahrenden Autos), `led_contact` (1–10); die Reihenfolge ist die Priorität der Empfehlung |
 | `[leds]` | `team`: euer fester Teamname; die Spam-Sperre zählt pro Team |
-| `[display]` | `rotation`, `x_offset`/`y_offset`, `bgr`, `invert`: so, wie es das Testbild aus `examples/tft_display_demo.py` ergibt |
+| `[display]` | `enabled`: `false`, solange kein Schild angeschlossen ist; `rotation`, `x_offset`/`y_offset`, `bgr`, `invert`: so, wie es das Testbild aus `examples/tft_display_demo.py` ergibt |
 
 Tippfehler fallen sofort auf: Unbekannte Schlüssel, doppelte Zonen oder
 doppelte LED-Kontakte bricht das Programm beim Start mit einer Fehlermeldung
@@ -154,8 +160,9 @@ mosquitto_pub -h hackathon.local -u "$MQTT_USER" -P "$MQTT_PASSWORD" \
 -t bma/events -f testdaten/einfahrt.json
 ```
 
-Das Schild zeigt jetzt 10 Sekunden lang einen Pfeil nach links und „1 frei“.
-Mit `testdaten/p1-belegt.json` geht LED 1 an und das Schild zeigt das X.
+LED 1 blinkt jetzt 10 Sekunden lang (P1 ist der empfohlene Platz); ein
+Schild würde einen Pfeil nach rechts und „1 frei“ zeigen. Mit
+`testdaten/p1-belegt.json` geht LED 1 dauerhaft an.
 
 > Die anderen Teams bekommen diese Events auch. Ihre Programme sollten sie
 > ignorieren, solange ihre Zonen anders heißen.
@@ -170,6 +177,12 @@ Mit `testdaten/p1-belegt.json` geht LED 1 an und das Schild zeigt das X.
   **ändert**. Die Zonen melden sich auch ohne Änderung alle paar Sekunden;
   jedes Mal zu senden, würde schnell die Spam-Sperre von bmc-interface
   auslösen.
+- **Empfehlung:** Seite mit den meisten freien Plätzen, bei Gleichstand
+  links; auf dieser Seite der erste freie Platz in der Reihenfolge der
+  `[[spaces]]`-Blöcke. Seine LED blinkt (alle 0,5 s an/aus, je ein
+  `permanent`-Befehl). Mit `normal`-Impulsen ginge es nicht: Während ein
+  Impuls läuft, ignoriert bmc-interface `permanent`-Befehle, ein
+  einparkendes Auto ließe die LED dann dunkel.
 - **Richtung:** Pfeil zur Seite mit den meisten freien Plätzen, bei
   Gleichstand nach links. Ändert sich die Belegung, während der Pfeil steht,
   dreht er sich mit.
@@ -238,9 +251,9 @@ an derselben Stelle ein einfacher Rekorder, der sich die Aufrufe merkt.
 ### Ablauf zur Laufzeit
 
 Zwei Threads arbeiten gleichzeitig (`par`): paho empfängt Nachrichten in
-seinem eigenen Netzwerk-Thread, der Haupt-Thread zeichnet das Schild. Beide
-treffen sich im `ParkingGuide`, den ein Lock schützt. Das Beispiel: Platz P1
-wird frei, dann fährt ein Auto ein.
+seinem eigenen Netzwerk-Thread, der Haupt-Thread taktet das Blinken und
+zeichnet das Schild. Beide treffen sich im `ParkingGuide`, den ein Lock
+schützt. Das Beispiel: Platz P1 wird frei, dann fährt ein Auto ein.
 
 ```mermaid
 sequenceDiagram
@@ -251,7 +264,7 @@ sequenceDiagram
     end
     participant G as ParkingGuide<br/>(mit Lock)
     box Haupt-Thread
-        participant S as sign.run_sign
+        participant S as main_loop
     end
     participant TFT as TFT-Schild
     participant BMC as BMA<br/>bmc-interface
@@ -271,12 +284,17 @@ sequenceDiagram
         BMA->>GW: crossingLineEvent Einfahrt, in
         GW->>EV: handle_payload(payload)
         EV->>G: on_vehicle_entered(now)
-    and Schild
-        loop alle 0,2 s
-            S->>G: screen(now)
-            G-->>S: Guidance(LEFT, free=1)
-            opt andere Anzeige als zuletzt
-                S->>TFT: display(render(screen))
+    and Hauptschleife
+        loop alle 0,1 s
+            S->>G: tick(now)
+            opt Blink-Phase der empfohlenen LED wechselt
+                G->>GW: switch(1, on=True/False)
+                GW->>BMC: LED-Befehl
+            end
+            opt Schild eingeschaltet
+                S->>G: screen(now)
+                G-->>S: Guidance(RIGHT, free=1)
+                S->>TFT: display(render(screen)), nur bei Änderung
             end
         end
     end
@@ -299,7 +317,8 @@ sequenceDiagram
 | `guide.py` | reagiert auf Zonen und Einfahrten, schaltet LEDs, entscheidet die Anzeige |
 | `events.py` | BMA-Events (über `detection_worker`) an den `guide` weiterreichen |
 | `rendering.py` | Anzeige als 160 × 128-Bild zeichnen (Pillow) |
-| `sign.py` | Anzeigeschleife: neu zeichnen, wenn sich etwas ändert |
+| `main_loop.py` | Hauptschleife: Blinken takten, Schild (falls vorhanden) aktualisieren |
+| `sign.py` | Schild: neu zeichnen, wenn sich die Anzeige ändert |
 | `led_command.py` | LED-Befehl im Format von [doc/leds-per-mqtt.md](../doc/leds-per-mqtt.md) |
 | `mqtt_gateway.py` | eine MQTT-Verbindung: Events abonnieren, LED-Befehle senden |
 | `config.py` | `config.toml` lesen und prüfen |

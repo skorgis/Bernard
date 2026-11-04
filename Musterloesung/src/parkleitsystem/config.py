@@ -38,6 +38,10 @@ class LedSettings(_Section):
     topic: str = "bmc_interface/tirol-hackathon/out"
     bma_id: str = HACKATHON_BMA_ID
     team: str
+    lit_when: Literal["occupied", "free"] = Field(
+        default="occupied",
+        description="when a space's LED is on; 'free' for green LEDs",
+    )
 
 
 class EntrySettings(_Section):
@@ -53,8 +57,9 @@ class EntrySettings(_Section):
 
 
 class DisplaySettings(_Section):
-    """How the TFT is mounted; see tft_display.TftConfig."""
+    """Whether a TFT is installed and how; see tft_display.TftConfig."""
 
+    enabled: bool = True
     rotation: Literal[0, 90, 180, 270] = 0
     x_offset: int = 0
     y_offset: int = 0
