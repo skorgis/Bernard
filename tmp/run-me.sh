@@ -18,7 +18,7 @@ BROKER_PORT=1883
 BROKER_CHECK="import socket; socket.create_connection(('$BROKER', $BROKER_PORT), 5); print('broker $BROKER:$BROKER_PORT reachable')"
 # One SSH connection for all steps, so the password is asked only once.
 SSH_OPTS=(-o ControlMaster=auto -o "ControlPath=$HOME/.ssh/cm-%r@%h:%p" -o ControlPersist=300)
-# Image built on the hackathon Pi from vendor/bmc-interface (see README).
+# Image built on the hackathon Pi from bmc-interface commit 4fc8393 (see README).
 PI_SSH=(-i "$HOME/.ssh/id_rsa" -o IdentitiesOnly=yes pi@hackathon.local)
 IMAGE=bmc-interface:hackathon
 IMAGE_PINNED=bmc-interface:4fc8393

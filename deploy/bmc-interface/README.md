@@ -9,9 +9,8 @@ der Mosquitto-Container auf dem Hackathon-Raspberry-Pi
 ([`deploy/pi-broker`](../pi-broker/README.md)); ein Cloud-Broker wird nicht
 verwendet.
 
-Der Quellcode von bmc-interface liegt als Git-Submodule unter
-[`vendor/bmc-interface`](../../vendor/bmc-interface) (nach dem Klonen:
-`git submodule update --init vendor/bmc-interface`). Daraus wird das Image
+Der Quellcode von bmc-interface liegt im (internen) Repository
+`bernard-technologies/bmc-interface`, nicht in diesem Repository. Daraus wird das Image
 auf dem Raspberry Pi gebaut (arm64 wie der BMA) und per `docker save |
 docker load` auf den BMA kopiert. Keine Container-Registry, keine
 Azure-Zugangsdaten.
@@ -149,20 +148,26 @@ ssh -t G-A2610-0007 \
 
 ## Image bauen (auf dem Pi)
 
-Zuletzt gebaut am 27.10.2026 aus Commit `4fc8393` (295 MB, arm64). Neu bauen,
-wenn das Submodule `vendor/bmc-interface` aktualisiert wurde; das Tag dann
-auf den neuen Commit setzen (auch in `tmp/run-me.sh`).
+Zuletzt gebaut am 27.10.2026 aus Commit `4fc8393` (295 MB, arm64). Für einen
+neueren Stand den Commit unten und das Tag ersetzen (auch in
+`tmp/run-me.sh`).
 
-1. Quellcode auf den Pi kopieren (ohne `.git` und Caches):
+1. bmc-interface klonen (braucht Zugriff auf das interne Repository):
 
 ```bash
-tar -C vendor/bmc-interface --exclude=.git --exclude=__pycache__ \
---exclude=.venv -czf - . \
-| ssh -i ~/.ssh/id_rsa -o IdentitiesOnly=yes pi@hackathon.local \
-'rm -rf ~/bmc-interface-src && mkdir ~/bmc-interface-src && tar -C ~/bmc-interface-src -xzf -'
+git clone git@github.com:bernard-technologies/bmc-interface.git \
+~/bmc-interface
 ```
 
-2. Bauen, mit Commit-Tag und dem Tag `hackathon`, auf das
+2. Genau diesen Commit auf den Pi kopieren (ohne `.git`):
+
+```bash
+git -C ~/bmc-interface archive 4fc8393 \
+| ssh -i ~/.ssh/id_rsa -o IdentitiesOnly=yes pi@hackathon.local \
+'rm -rf ~/bmc-interface-src && mkdir ~/bmc-interface-src && tar -C ~/bmc-interface-src -xf -'
+```
+
+3. Bauen, mit Commit-Tag und dem Tag `hackathon`, auf das
    `start.sh` verweist:
 
 ```bash
@@ -170,7 +175,7 @@ ssh -i ~/.ssh/id_rsa -o IdentitiesOnly=yes pi@hackathon.local \
 'cd ~/bmc-interface-src && docker build -t bmc-interface:4fc8393 -t bmc-interface:hackathon .'
 ```
 
-3. Kurztest ohne Netzwerk (Importe und C-Bibliothek):
+4. Kurztest ohne Netzwerk (Importe und C-Bibliothek):
 
 ```bash
 ssh -i ~/.ssh/id_rsa -o IdentitiesOnly=yes pi@hackathon.local \

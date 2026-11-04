@@ -2,7 +2,7 @@
 # Starts bmc-interface on BMA G-A2610-0007 (Raspberry Pi CM5) for the Tirol
 # hackathon. BMAv3 has no `docker compose`, so this is plain `docker run`.
 # Differences from upstream bernard-technologies/bmc-interface:
-# - Locally built image (on the hackathon Pi, from vendor/bmc-interface,
+# - Locally built image (on the hackathon Pi, from bmc-interface commit 4fc8393,
 #   copied with `docker save | docker load`) instead of swarm.azurecr.io.
 # - The BMC hangs on /dev/ttyAMA2 on the CM5; bmc-interface hard-codes the
 #   Jetson port /dev/ttyTHS2, so the device is exposed under that name.

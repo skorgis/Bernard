@@ -1,7 +1,6 @@
 target-version = "py312"
 line-length = 80
 # Third-party code copied as-is (former submodules); not ours to restyle.
-extend-exclude = ["vendor"]
 
 [lint]
 select = [
