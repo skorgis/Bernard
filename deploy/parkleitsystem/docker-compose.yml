@@ -1,0 +1,16 @@
+# Parking guidance on the hackathon Raspberry Pi (hackathon.local).
+# Build from this directory: docker compose up -d --build
+services:
+  parkleitsystem:
+    build:
+      context: ../..
+      dockerfile: deploy/parkleitsystem/Dockerfile
+    image: parkleitsystem:hackathon
+    container_name: parkleitsystem
+    restart: unless-stopped
+    # Host network: Mosquitto (deploy/pi-broker) publishes port 1883 on the
+    # Pi, so the program reaches it as localhost like a native process.
+    network_mode: host
+    env_file: .env          # MQTT_USER, MQTT_PASSWORD
+    volumes:
+      - ./config.toml:/config/config.toml:ro

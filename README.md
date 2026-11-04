@@ -41,12 +41,14 @@ Rollstuhl-Kennzeichen, und leitet diese Autos zu einem Behindertenparkplatz.
 
 ## Was ist schon fertig?
 
-Ihr müsst nicht bei null anfangen. Dieses Repository enthält zwei fertige
+Ihr müsst nicht bei null anfangen. Dieses Repository enthält vier fertige
 Bausteine:
 
 | Baustein | Wofür? | Doku |
 | --- | --- | --- |
 | `detection_worker` | Verbindet sich mit dem MQTT-Broker, liest die BMA-Events und wandelt sie in Python-Objekte um. Ihr könnt Funktionen registrieren, die bei bestimmten Events aufgerufen werden. | [src/detection_worker/README.md](src/detection_worker/README.md) |
+| `bmc_leds` | Baut den MQTT-Befehl, der eine LED am Parkplatz an- oder ausschaltet (`led_command`). Ihr müsst ihn nur noch senden. | [doc/leds-per-mqtt.md](doc/leds-per-mqtt.md) |
+| `tft_display` | Öffnet den TFT-Bildschirm am Pi; ihr zeichnet ein Bild mit Pillow und zeigt es mit einem Aufruf an. Ohne Bildschirm schreibt `PngPreview` das Bild in eine Datei. | [doc/tft-display.md](doc/tft-display.md) |
 | `picture_pipeline` | Findet bekannte Logos/Symbole in Kamerabildern, inklusive einer Oberfläche zum Ausprobieren und Einstellen. Für den Bonus. | [src/picture_pipeline/README.md](src/picture_pipeline/README.md) |
 
 Der Teil, den ihr selbst baut: **die Logik** (welcher Platz ist frei, wohin
@@ -224,21 +226,47 @@ offizielle Beschreibung des Formats (Schema 6.0) steht unter
 
 ### Wie ist der BMA eingerichtet?
 
-<!-- TODO: fill in once the BMA configuration for the parking lot is final. -->
+Noch nichts :P das ist eure Aufgabe:
 
-| Name (`roiName` / `lineName`) | Typ | Bedeutung |
-| --- | --- | --- |
-| `<TODO>` | Linie | Einfahrt |
-| `<TODO>` | Zone | Parkplatz 1 |
-| `<TODO>` | Zone | Behindertenparkplatz |
+Nutzt die Web Oberfläche um passende Crossing Lines einzuzeichnen?
+
+Probiert unterschiedliche Blickwinkel der Kamera um Fahrzeuge besser zu erkennen.
+
+Experimentiert etwas.
 
 ## Das Schild: der TFT-Bildschirm
 
-<!-- TODO: describe how the TFT display is driven (library, resolution,
-     example code), or whether that is left to the teams. -->
+Das Schild ist ein Farbbildschirm mit **160 × 128 Pixeln** (Joy-IT
+RB-TFT1.8), der direkt am Raspberry Pi hängt. Ihr zeichnet mit Pillow ein Bild
+in genau dieser Größe und schickt es mit `display()` auf den Bildschirm:
 
-Der TFT-Bildschirm hängt am Raspberry Pi. **TODO:** Wie man ihn anspricht,
-welche Bibliothek und welche Auflösung, ergänzen wir hier.
+```python
+from PIL import Image, ImageDraw
+
+from tft_display import TftConfig, open_tft
+
+with open_tft(TftConfig()) as tft:
+    image = Image.new("RGB", tft.size, "black")
+    draw = ImageDraw.Draw(image)
+    draw.polygon([(10, 64), (60, 20), (60, 108)], fill="green")  # ◄
+    tft.display(image)
+    input("Enter zum Beenden")
+```
+
+Auf dem Pi braucht ihr dafür einmal `uv sync --extra pi`. Zum Ausprobieren:
+
+```bash
+uv run python examples/tft_hello.py
+```
+
+Ohne Bildschirm, z. B. am Laptop, schreibt die Demo PNG-Dateien:
+
+```bash
+uv run python examples/tft_display_demo.py --preview tmp/tft
+```
+
+Verdrahtung, Testbild, Pillow-Befehle zum Zeichnen und Fehlersuche:
+[`doc/tft-display.md`](doc/tft-display.md).
 
 Ideen für die Anzeige:
 
@@ -256,6 +284,65 @@ Schnelltest:
 ```bash
 uv run python examples/bmc_mqtt_switch.py --team team-1 --contact 3 --on
 ```
+
+Aus eurem Python-Programm, mit einem verbundenen paho-Client `client`:
+
+```python
+import json
+
+from bmc_leds import LED_TOPIC, led_command
+
+befehl = led_command(team="team-1", led=3, on=True)
+client.publish(LED_TOPIC, json.dumps(befehl), qos=1)
+```
+
+## Das Kamerabild ansehen
+
+Ihr könnt live sehen, was die Kamera des BMA sieht. Das Bild kommt über den
+Raspberry Pi, ihr müsst nur im Hackathon-WLAN sein:
+
+```
+http://hackathon.local:8080/stream.ts
+```
+
+Das erste Bild kann bis zu 2 Sekunden dauern.
+
+**VLC** (am einfachsten): Medien → Netzwerkstream öffnen → die Adresse oben
+eintragen → Wiedergabe.
+
+**ffplay** (kleinste Verzögerung, braucht ffmpeg):
+
+```bash
+ffplay -fflags nobuffer -flags low_delay http://hackathon.local:8080/stream.ts
+```
+
+**Python mit OpenCV** (ist im Projekt schon installiert), zum Beispiel um
+Bilder für den [Bonus](#bonus-symbole-erkennen) zu verwenden:
+
+```python
+import cv2
+
+cap = cv2.VideoCapture(
+    "http://hackathon.local:8080/stream.ts",
+    cv2.CAP_FFMPEG,
+    [cv2.CAP_PROP_N_THREADS, 1],
+)
+while True:
+    ok, frame = cap.read()
+    if not ok:
+        break
+    cv2.imshow("BMA", frame)
+    if cv2.waitKey(1) == ord("q"):
+        break
+cap.release()
+cv2.destroyAllWindows()
+```
+
+`CAP_PROP_N_THREADS, 1` ist wichtig: Sonst hält jeder Decoder-Thread ein Bild
+zurück und das Video hängt eine halbe Sekunde hinterher. Beenden mit `q`.
+
+Bitte schaltet den Stream ab, wenn ihr ihn nicht braucht: Jeder Zuschauer
+belastet das WLAN.
 
 ## Bonus: Symbole erkennen
 
@@ -327,6 +414,7 @@ mosquitto_pub -h <TODO: Hostname/IP des Pi> -t '<TODO: Topic>' \
 | Verbindung bricht ständig ab | Nutzt ein anderes Team dieselbe `client_id`? |
 | Keine Events | Mit `mosquitto_sub -t '#' -v` prüfen, auf welchem Topic die Events wirklich ankommen. |
 | Funktion wird nie aufgerufen | Stimmen Topic, Name und Event-Typ im `HandlerKey` mit den echten Nachrichten überein? Groß-/Kleinschreibung beachten. |
+| Kamerabild lädt nicht oder bricht nach ein paar Sekunden ab | Seid ihr im Hackathon-WLAN? Dann sagt uns Bescheid: Der Stream muss auf dem BMA gestartet sein. |
 | Mehr Details sehen | `logging.basicConfig(level=logging.DEBUG)` statt `INFO` setzen. |
 
 Und natürlich: **Fragt uns!** Wir sind den ganzen Hackathon über vor Ort.
@@ -342,8 +430,12 @@ Und natürlich: **Fragt uns!** Wir sind den ganzen Hackathon über vor Ort.
 
 ## Für Betreuer
 
-BMA per LAN erreichen, Firewall-Freigaben und Kamerabild auf einen Test-PC
-holen: [doc/bma-betreuer.md](doc/bma-betreuer.md).
+- Schnellstart, per LAN-Kabel auf den BMA:
+  [doc/bma-lan-verbindung.md](doc/bma-lan-verbindung.md).
+- BMA per LAN erreichen, Firewall-Freigaben und Kamerabild auf einen Test-PC
+  holen: [doc/bma-betreuer.md](doc/bma-betreuer.md).
+- Musterlösung (Pfeil und freie Plätze auf dem TFT, eine LED pro Parkplatz)
+  mit Aufbau-Grafik: [Musterloesung/README.md](Musterloesung/README.md).
 
 ## Links
 

@@ -107,20 +107,20 @@ Eine Nachricht wird **ohne Fehlermeldung ignoriert**, wenn …
 
 ## In Python
 
-`paho-mqtt` ist im Projekt schon installiert. Diese Funktion versteckt das
-Nachrichtenformat:
+`paho-mqtt` ist im Projekt schon installiert. Die Nachricht müsst ihr nicht
+selbst zusammenbauen: `led_command` aus dem Paket `bmc_leds` (liegt unter
+[`src/bmc_leds`](../src/bmc_leds/__init__.py)) erzeugt sie mit neuer ID und
+aktuellem Zeitstempel und prüft die Kontaktnummer:
 
 ```python
 import json
 import os
 import time
-import uuid
-from datetime import datetime, timezone
 
 import paho.mqtt.client as mqtt
 
-LED_TOPIC = "bmc_interface/tirol-hackathon/out"
-BMA_ID = "f6b51cd4-4469-4138-831a-b5cc471f9e45"
+from bmc_leds import LED_TOPIC, led_command
+
 TEAM = "team-1"
 
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
@@ -131,25 +131,15 @@ client.loop_start()
 
 def led(nummer, an, dauer=None):
     """Schaltet LED `nummer` (1-10) an oder aus; mit `dauer` nur kurz an."""
-    kontakt = {"id": str(nummer), "type": "permanent", "state": "ON" if an else "OFF"}
-    if dauer is not None:
-        kontakt.update(type="normal", duration=dauer)
-    befehl = {
-        "command_id": str(uuid.uuid4()),
-        "target_uuid": BMA_ID,
-        "source_uuid": TEAM,
-        "command": "ENABLE",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "contacts": [kontakt],
-    }
+    befehl = led_command(team=TEAM, led=nummer, on=an, duration_s=dauer)
     client.publish(LED_TOPIC, json.dumps(befehl), qos=1)
 
 
-led(3, True)           # LED 3 an
+led(3, True)  # LED 3 an
 time.sleep(2)
-led(3, False)          # LED 3 aus
+led(3, False)  # LED 3 aus
 led(5, True, dauer=1)  # LED 5 leuchtet 1 Sekunde
-time.sleep(1)          # kurz warten, damit die letzte Nachricht rausgeht
+time.sleep(1)  # kurz warten, damit die letzte Nachricht rausgeht
 ```
 
 ## Auf Events reagieren
@@ -181,12 +171,18 @@ bzw. 3 kurz aufleuchten, wenn ein Auto ein- oder ausfährt. Es nutzt die
 Funktion `led()` von oben:
 
 ```python
+import zlib
+
 EVENT_TOPIC = "bma/events"
 letzter_zustand = {}  # roiId -> True/False
 
 
 def bei_event(client, userdata, nachricht):
-    event = json.loads(nachricht.payload)
+    daten = nachricht.payload
+    # Der BMA kann Events zlib-komprimiert schicken; sie beginnen mit 0x78.
+    if daten[:1] == b"\x78":
+        daten = zlib.decompress(daten)
+    event = json.loads(daten)
 
     if roi := event.get("regionOfInterestEvent"):
         belegt = roi["state"] == "occupied"

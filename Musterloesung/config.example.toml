@@ -1,0 +1,84 @@
+# Configuration of the sample solution. Copy to config.toml and adapt.
+# Names must match the BMA configuration exactly (case-sensitive): check
+# in the log (`docker logs parkleitsystem`) which names arrive.
+# Broker login comes from the environment: MQTT_USER, MQTT_PASSWORD.
+
+[mqtt]
+host = "localhost"          # the program runs on the Pi next to Mosquitto
+port = 1883
+client_id = "parkleitsystem-musterloesung"   # unique per running program
+event_topic = "bma/events"
+
+[leds]
+topic = "bmc_interface/tirol-hackathon/out"
+bma_id = "f6b51cd4-4469-4138-831a-b5cc471f9e45"   # BMA G-A2610-0007
+team = "musterloesung"      # source_uuid; spam limit counts per team
+
+[entry]
+line_name = "Einfahrt"      # crossing line at the entry
+guidance_seconds = 10       # how long the recommended LED blinks (and the arrow stays)
+
+[display]
+enabled = false             # no TFT sign installed yet; LEDs work without it
+rotation = 0                # 0 = landscape 160x128; 180 if mounted upside down
+x_offset = 0                # shift if a coloured line shows at one edge
+y_offset = 0
+bgr = false                 # true if red and blue are swapped
+invert = false
+
+# One block per parking space: BMA zone (roiName), side seen from a car
+# crossing the entry line, and the BMC contact (1-10) of its LED. Within a
+# side, the first free space in this order is recommended (blinks), so each
+# row is listed starting next to the entry.
+# P1-P5: front row, on the driver's right.
+[[spaces]]
+name = "P1"
+side = "right"
+led = 1
+
+[[spaces]]
+name = "P2"
+side = "right"
+led = 2
+
+[[spaces]]
+name = "P3"
+side = "right"
+led = 3
+
+[[spaces]]
+name = "P4"
+side = "right"
+led = 4
+
+[[spaces]]
+name = "P5"
+side = "right"
+led = 5
+
+# P6-P10: back row, on the driver's left. Its LEDs are wired in
+# reverse: contact 6 is behind P10, contact 10 behind P6.
+[[spaces]]
+name = "P6"
+side = "left"
+led = 10
+
+[[spaces]]
+name = "P7"
+side = "left"
+led = 9
+
+[[spaces]]
+name = "P8"
+side = "left"
+led = 8
+
+[[spaces]]
+name = "P9"
+side = "left"
+led = 7
+
+[[spaces]]
+name = "P10"
+side = "left"
+led = 6

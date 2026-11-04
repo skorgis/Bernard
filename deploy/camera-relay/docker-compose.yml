@@ -1,0 +1,16 @@
+# Camera stream relay on the hackathon Raspberry Pi (hackathon.local).
+# Participants on the WLAN open http://hackathon.local:8080/stream.ts; the
+# relay forwards each connection over the LAN cable to camera_stream on the
+# BMA (169.254.42.1:8080), which they cannot reach directly.
+services:
+  camera-relay:
+    # Pinned: `latest` could silently pull a new version on `pull`.
+    image: alpine/socat:1.8.1.1
+    container_name: camera-relay
+    restart: unless-stopped
+    # Host network: listen on the WLAN and reach the BMA via eth0.
+    network_mode: host
+    # fork: one forwarding process per viewer, so several can watch at once.
+    command: >-
+      TCP-LISTEN:8080,fork,reuseaddr
+      TCP:169.254.42.1:8080,connect-timeout=5
