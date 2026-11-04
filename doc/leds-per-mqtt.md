@@ -131,7 +131,11 @@ client.loop_start()
 
 def led(nummer, an, dauer=None):
     """Schaltet LED `nummer` (1-10) an oder aus; mit `dauer` nur kurz an."""
-    kontakt = {"id": str(nummer), "type": "permanent", "state": "ON" if an else "OFF"}
+    kontakt = {
+        "id": str(nummer),
+        "type": "permanent",
+        "state": "ON" if an else "OFF",
+    }
     if dauer is not None:
         kontakt.update(type="normal", duration=dauer)
     befehl = {
@@ -145,11 +149,11 @@ def led(nummer, an, dauer=None):
     client.publish(LED_TOPIC, json.dumps(befehl), qos=1)
 
 
-led(3, True)           # LED 3 an
+led(3, True)  # LED 3 an
 time.sleep(2)
-led(3, False)          # LED 3 aus
+led(3, False)  # LED 3 aus
 led(5, True, dauer=1)  # LED 5 leuchtet 1 Sekunde
-time.sleep(1)          # kurz warten, damit die letzte Nachricht rausgeht
+time.sleep(1)  # kurz warten, damit die letzte Nachricht rausgeht
 ```
 
 ## Auf Events reagieren

@@ -6,13 +6,21 @@ authors = [{name = "Christoph Meyer",email = "christoph.meyer@bernard-gruppe.com
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "luma-lcd>=2.13.0",
     "numpy>=2.5.3",
     "opencv-contrib-python>=5.0.0.93",
     "paho-mqtt>=2.1.0",
+    "pillow>=13.0.0",
 ]
 
 [project.scripts]
 detection-worker = "detection_worker.cli:main"
+
+[project.optional-dependencies]
+# Kernel SPI and GPIO bindings for tft_display: only installable on the Pi.
+pi = [
+    "luma-core[gpio,spi]>=2.6.0",
+]
 
 [dependency-groups]
 dev = [
@@ -22,7 +30,11 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/tirol_hackathon_bernard_gruppe", "src/detection_worker", "src/picture_pipeline"]
+packages = ["src/tirol_hackathon_bernard_gruppe", "src/detection_worker", "src/picture_pipeline", "src/tft_display"]
+
+[tool.pytest.ini_options]
+# Musterloesung/ is a separate uv project with its own tests and venv.
+testpaths = ["tests"]
 
 [tool.pyright]
 include = ["src", "tests", "examples", "main.py"]

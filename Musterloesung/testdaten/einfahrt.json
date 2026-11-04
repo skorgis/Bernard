@@ -1,0 +1,20 @@
+{
+  "uuid": "test-einfahrt",
+  "version": "6.0",
+  "eventSchema": "https://docs.bernard-gruppe.com/events/schema/6.0",
+  "node": {
+    "id": "f6b51cd4-4469-4138-831a-b5cc471f9e45",
+    "name": "G-A2610-0007"
+  },
+  "stream": {
+    "id": "test-stream",
+    "name": "musterloesung-test"
+  },
+  "crossingLineEvent": {
+    "class": "car",
+    "lineId": "test-line",
+    "lineName": "Einfahrt",
+    "direction": "in",
+    "timestamp": "2026-11-02T09:30:05Z"
+  }
+}

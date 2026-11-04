@@ -41,12 +41,13 @@ Rollstuhl-Kennzeichen, und leitet diese Autos zu einem Behindertenparkplatz.
 
 ## Was ist schon fertig?
 
-Ihr müsst nicht bei null anfangen. Dieses Repository enthält zwei fertige
+Ihr müsst nicht bei null anfangen. Dieses Repository enthält drei fertige
 Bausteine:
 
 | Baustein | Wofür? | Doku |
 | --- | --- | --- |
 | `detection_worker` | Verbindet sich mit dem MQTT-Broker, liest die BMA-Events und wandelt sie in Python-Objekte um. Ihr könnt Funktionen registrieren, die bei bestimmten Events aufgerufen werden. | [src/detection_worker/README.md](src/detection_worker/README.md) |
+| `tft_display` | Öffnet den TFT-Bildschirm am Pi; ihr zeichnet ein Bild mit Pillow und zeigt es mit einem Aufruf an. Ohne Bildschirm schreibt `PngPreview` das Bild in eine Datei. | [doc/tft-display.md](doc/tft-display.md) |
 | `picture_pipeline` | Findet bekannte Logos/Symbole in Kamerabildern, inklusive einer Oberfläche zum Ausprobieren und Einstellen. Für den Bonus. | [src/picture_pipeline/README.md](src/picture_pipeline/README.md) |
 
 Der Teil, den ihr selbst baut: **die Logik** (welcher Platz ist frei, wohin
@@ -224,21 +225,47 @@ offizielle Beschreibung des Formats (Schema 6.0) steht unter
 
 ### Wie ist der BMA eingerichtet?
 
-<!-- TODO: fill in once the BMA configuration for the parking lot is final. -->
+Noch nichts :P das ist eure Aufgabe:
 
-| Name (`roiName` / `lineName`) | Typ | Bedeutung |
-| --- | --- | --- |
-| `<TODO>` | Linie | Einfahrt |
-| `<TODO>` | Zone | Parkplatz 1 |
-| `<TODO>` | Zone | Behindertenparkplatz |
+Nutzt die Web Oberfläche um passende Crossing Lines einzuzeichnen?
+
+Probiert unterschiedliche Blickwinkel der Kamera um Fahrzeuge besser zu erkennen.
+
+Experimentiert etwas.
 
 ## Das Schild: der TFT-Bildschirm
 
-<!-- TODO: describe how the TFT display is driven (library, resolution,
-     example code), or whether that is left to the teams. -->
+Das Schild ist ein Farbbildschirm mit **160 × 128 Pixeln** (Joy-IT
+RB-TFT1.8), der direkt am Raspberry Pi hängt. Ihr zeichnet mit Pillow ein Bild
+in genau dieser Größe und schickt es mit `display()` auf den Bildschirm:
 
-Der TFT-Bildschirm hängt am Raspberry Pi. **TODO:** Wie man ihn anspricht,
-welche Bibliothek und welche Auflösung, ergänzen wir hier.
+```python
+from PIL import Image, ImageDraw
+
+from tft_display import TftConfig, open_tft
+
+with open_tft(TftConfig()) as tft:
+    image = Image.new("RGB", tft.size, "black")
+    draw = ImageDraw.Draw(image)
+    draw.polygon([(10, 64), (60, 20), (60, 108)], fill="green")  # ◄
+    tft.display(image)
+    input("Enter zum Beenden")
+```
+
+Auf dem Pi braucht ihr dafür einmal `uv sync --extra pi`. Zum Ausprobieren:
+
+```bash
+uv run python examples/tft_hello.py
+```
+
+Ohne Bildschirm, z. B. am Laptop, schreibt die Demo PNG-Dateien:
+
+```bash
+uv run python examples/tft_display_demo.py --preview tmp/tft
+```
+
+Verdrahtung, Testbild, Pillow-Befehle zum Zeichnen und Fehlersuche:
+[`doc/tft-display.md`](doc/tft-display.md).
 
 Ideen für die Anzeige:
 
@@ -342,8 +369,12 @@ Und natürlich: **Fragt uns!** Wir sind den ganzen Hackathon über vor Ort.
 
 ## Für Betreuer
 
-BMA per LAN erreichen, Firewall-Freigaben und Kamerabild auf einen Test-PC
-holen: [doc/bma-betreuer.md](doc/bma-betreuer.md).
+- Schnellstart, per LAN-Kabel auf den BMA:
+  [doc/bma-lan-verbindung.md](doc/bma-lan-verbindung.md).
+- BMA per LAN erreichen, Firewall-Freigaben und Kamerabild auf einen Test-PC
+  holen: [doc/bma-betreuer.md](doc/bma-betreuer.md).
+- Musterlösung (Pfeil und freie Plätze auf dem TFT, eine LED pro Parkplatz)
+  mit Aufbau-Grafik: [Musterloesung/README.md](Musterloesung/README.md).
 
 ## Links
 

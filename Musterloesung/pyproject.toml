@@ -1,0 +1,63 @@
+[project]
+name = "parkleitsystem"
+version = "0.1.0"
+description = "Sample solution: guide cars entering the Lego car park via a TFT sign and switch one LED per parking space"
+readme = "README.md"
+authors = [
+    { name = "christoph meyer", email = "christoph.meyer@bernard-gruppe.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.5.4",
+    "paho-mqtt>=2.1.0",
+    "pillow>=13.0.0",
+    "pydantic>=2.14.2",
+    "tirol-hackathon-bernard-gruppe",
+]
+
+[project.scripts]
+parkleitsystem = "parkleitsystem.cli:main"
+
+[project.optional-dependencies]
+# Drivers for the real TFT (spidev, gpiod): only installable on the Pi.
+pi = ["tirol-hackathon-bernard-gruppe[pi]"]
+
+[build-system]
+requires = ["uv_build>=0.12.4,<0.13.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+tirol-hackathon-bernard-gruppe = { path = "../", editable = true }
+
+[dependency-groups]
+dev = [
+    "pyright>=1.1.414",
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--import-mode=importlib"]
+
+[tool.pyright]
+include = ["src", "tests"]
+typeCheckingMode = "standard"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 80
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "N", "RUF", "D"]
+ignore = [
+    "D203",  # conflicts with D211 (no blank line before class docstring)
+    "D212",  # conflicts with D213; the repo writes the summary on line one
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D"]
+"__init__.py" = ["D104"]
