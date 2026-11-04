@@ -1,6 +1,6 @@
 # Configuration of the sample solution. Copy to config.toml and adapt.
 # Names must match the BMA configuration exactly (case-sensitive): check
-# with `mosquitto_sub -t bma/events -v` which lineName/roiName arrive.
+# in the log (`docker logs parkleitsystem`) which names arrive.
 # Broker login comes from the environment: MQTT_USER, MQTT_PASSWORD.
 
 [mqtt]
@@ -13,13 +13,10 @@ event_topic = "bma/events"
 topic = "bmc_interface/tirol-hackathon/out"
 bma_id = "f6b51cd4-4469-4138-831a-b5cc471f9e45"   # BMA G-A2610-0007
 team = "musterloesung"      # source_uuid; spam limit counts per team
-lit_when = "free"           # green LEDs: on while free; "occupied" = on while taken
 
 [entry]
 line_name = "Einfahrt"      # crossing line at the entry
-direction = "in"            # only cars driving in get guidance
-guidance_seconds = 10       # how long the arrow stays after a car enters
-vehicle_classes = []        # e.g. ["car"]; empty = every detected class
+guidance_seconds = 10       # how long the recommended LED blinks (and the arrow stays)
 
 [display]
 enabled = false             # no TFT sign installed yet; LEDs work without it
@@ -35,53 +32,53 @@ invert = false
 # row is listed starting next to the entry.
 # P1-P5: front row, on the driver's right.
 [[spaces]]
-roi_name = "P1"
+name = "P1"
 side = "right"
-led_contact = 1
+led = 1
 
 [[spaces]]
-roi_name = "P2"
+name = "P2"
 side = "right"
-led_contact = 2
+led = 2
 
 [[spaces]]
-roi_name = "P3"
+name = "P3"
 side = "right"
-led_contact = 3
+led = 3
 
 [[spaces]]
-roi_name = "P4"
+name = "P4"
 side = "right"
-led_contact = 4
+led = 4
 
 [[spaces]]
-roi_name = "P5"
+name = "P5"
 side = "right"
-led_contact = 5
+led = 5
 
 # P6-P10: back row, on the driver's left. Its LEDs are wired in
 # reverse: contact 6 is behind P10, contact 10 behind P6.
 [[spaces]]
-roi_name = "P6"
+name = "P6"
 side = "left"
-led_contact = 10
+led = 10
 
 [[spaces]]
-roi_name = "P7"
+name = "P7"
 side = "left"
-led_contact = 9
+led = 9
 
 [[spaces]]
-roi_name = "P8"
+name = "P8"
 side = "left"
-led_contact = 8
+led = 8
 
 [[spaces]]
-roi_name = "P9"
+name = "P9"
 side = "left"
-led_contact = 7
+led = 7
 
 [[spaces]]
-roi_name = "P10"
+name = "P10"
 side = "left"
-led_contact = 6
+led = 6

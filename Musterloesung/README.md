@@ -126,24 +126,18 @@ neu lädt.
 
 Alles steht in `config.toml`, die Vorlage ist
 [`config.example.toml`](config.example.toml). Die Namen müssen **genau** so
-heißen wie im BMA (Groß-/Kleinschreibung zählt). Welche Namen ankommen, seht
-ihr mit:
-
-```bash
-mosquitto_sub -h hackathon.local -u "$MQTT_USER" -P "$MQTT_PASSWORD" \
--t bma/events -v
-```
+heißen wie im BMA (Groß-/Kleinschreibung zählt). Welche Namen ankommen, steht
+im Log des Programms (`docker logs parkleitsystem` bzw. im Terminal).
 
 | Abschnitt | Wichtig |
 | --- | --- |
-| `[entry]` | `line_name`: Name der Einfahrt-Linie (`lineName`); `guidance_seconds`: wie lange der Pfeil stehen bleibt; `vehicle_classes`: z. B. `["car"]`, damit eine Hand auf der Linie keinen Pfeil auslöst |
-| `[[spaces]]` | ein Block pro Parkplatz: `roi_name` (Zone im BMA), `side` (`"left"`/`"right"`, aus Sicht des einfahrenden Autos), `led_contact` (1–10); die Reihenfolge ist die Priorität der Empfehlung |
+| `[entry]` | `line_name`: Name der Einfahrt-Linie im BMA; `guidance_seconds`: wie lange die empfohlene LED blinkt (und der Pfeil steht) |
+| `[[spaces]]` | ein Block pro Parkplatz: `name` (Zone im BMA), `side` (`"left"`/`"right"`, aus Sicht des einfahrenden Autos), `led` (BMC-Kontakt 1–10); die Reihenfolge ist die Priorität der Empfehlung |
 | `[leds]` | `team`: euer fester Teamname; die Spam-Sperre zählt pro Team |
 | `[display]` | `enabled`: `false`, solange kein Schild angeschlossen ist; `rotation`, `x_offset`/`y_offset`, `bgr`, `invert`: so, wie es das Testbild aus `examples/tft_display_demo.py` ergibt |
 
 Tippfehler fallen sofort auf: Unbekannte Schlüssel, doppelte Zonen oder
-doppelte LED-Kontakte bricht das Programm beim Start mit einer Fehlermeldung
-ab.
+doppelte LEDs bricht das Programm beim Start mit einer Fehlermeldung ab.
 
 ## Ohne BMA testen
 
@@ -160,9 +154,8 @@ mosquitto_pub -h hackathon.local -u "$MQTT_USER" -P "$MQTT_PASSWORD" \
 -t bma/events -f testdaten/einfahrt.json
 ```
 
-LED 1 blinkt jetzt 10 Sekunden lang (P1 ist der empfohlene Platz); ein
-Schild würde einen Pfeil nach rechts und „1 frei“ zeigen. Mit
-`testdaten/p1-belegt.json` geht LED 1 dauerhaft an.
+Jetzt blinkt 10 Sekunden lang die LED des empfohlenen Platzes. Mit
+`testdaten/p1-belegt.json` geht LED 1 an.
 
 > Die anderen Teams bekommen diese Events auch. Ihre Programme sollten sie
 > ignorieren, solange ihre Zonen anders heißen.
@@ -173,159 +166,67 @@ Schild würde einen Pfeil nach rechts und „1 frei“ zeigen. Mit
   Eine Zone, die sich noch nie gemeldet hat, zählt weder als frei noch als
   belegt. So wird kein Auto zu einem Platz geschickt, über den nichts bekannt
   ist.
-- **LEDs:** Ein LED-Befehl geht nur raus, wenn sich der Zustand eines Platzes
-  **ändert**. Die Zonen melden sich auch ohne Änderung alle paar Sekunden;
-  jedes Mal zu senden, würde schnell die Spam-Sperre von bmc-interface
-  auslösen.
+- **LEDs:** Kontakt an = belegt, aus = frei. Die zweifarbigen LEDs am Aufbau
+  zeigen damit frei in Grün. Ein Befehl geht nur raus, wenn sich der Zustand
+  **ändert**: Die Zonen melden sich auch ohne Änderung alle paar Sekunden,
+  jedes Mal zu senden würde die Spam-Sperre von bmc-interface auslösen.
 - **Empfehlung:** Seite mit den meisten freien Plätzen, bei Gleichstand
   links; auf dieser Seite der erste freie Platz in der Reihenfolge der
-  `[[spaces]]`-Blöcke. Seine LED blinkt (alle 0,5 s an/aus, je ein
-  `permanent`-Befehl). Mit `normal`-Impulsen ginge es nicht: Während ein
-  Impuls läuft, ignoriert bmc-interface `permanent`-Befehle, ein
-  einparkendes Auto ließe die LED dann dunkel.
-- **Richtung:** Pfeil zur Seite mit den meisten freien Plätzen, bei
-  Gleichstand nach links. Ändert sich die Belegung, während der Pfeil steht,
-  dreht er sich mit.
-- **X:** sobald kein Platz als frei bekannt ist, auch in Ruhe.
+  `[[spaces]]`-Blöcke. Seine LED blinkt (alle 0,5 s an/aus), bis das Auto dort
+  steht oder `guidance_seconds` vorbei ist. Geblinkt wird mit
+  `permanent`-Befehlen: Während ein `normal`-Impuls läuft, ignoriert
+  bmc-interface `permanent`-Befehle, ein einparkendes Auto ließe die LED dann
+  falsch stehen.
+- **Verdrahtung:** In der hinteren Reihe sind die LEDs umgekehrt
+  angeschlossen (Kontakt 6 hinter P10 … Kontakt 10 hinter P6), am 04.11.2026
+  vor Ort durchgeschaltet. Das steht nur in `config.example.toml`, der Code
+  weiß davon nichts.
+- **Schild (optional):** Pfeil zur Seite mit den meisten freien Plätzen,
+  darunter die Zahl freier Plätze; ein rotes X, sobald kein Platz frei ist.
 
 ## Aufbau des Codes
 
-Die Lösung folgt dem Prinzip der **Clean Architecture**: Der fachliche Kern
-kennt weder MQTT noch Bildschirm, Bibliotheken und Ein-/Ausgabe hängen außen
-an. Deshalb lässt sich der Kern ohne Hardware und ohne Broker testen.
-
-### Schichten und Abhängigkeiten
-
-Ein durchgezogener Pfeil heißt „importiert“. Alle zeigen **nach innen**
-(hier: nach unten): Außen darf innen kennen, nie umgekehrt.
-
-```mermaid
-flowchart TB
-    cli["cli.py<br/>Start: liest config.py, baut alles zusammen"]
-
-    subgraph adapter["Adapter: Bibliotheken und I/O"]
-        direction LR
-        subgraph eingang["Eingang"]
-            gateway["mqtt_gateway.py<br/><i>paho-mqtt</i>"]
-            events["events.py<br/><i>detection_worker</i>"]
-            ledcmd["led_command.py"]
-        end
-        subgraph ausgabe["Ausgabe"]
-            sign["sign.py<br/><i>tft_display</i>"]
-            rendering["rendering.py<br/><i>Pillow</i>"]
-        end
-    end
-
-    subgraph usecase["Anwendungsfall"]
-        guide["guide.py<br/>ParkingGuide"]
-        ledswitch(["LedSwitch<br/>Protocol"])
-    end
-
-    subgraph core["Fachlicher Kern: keine Bibliotheken, kein I/O"]
-        domain["domain.py<br/>ParkingLot, ParkingSpace, Side"]
-        screens["screens.py<br/>FreeSpaces | Guidance | NoSpace"]
-    end
-
-    cli --> gateway
-    cli --> sign
-    cli --> guide
-    gateway --> events
-    gateway --> ledcmd
-    gateway -. "erfüllt" .-> ledswitch
-    events --> guide
-    sign --> guide
-    sign --> rendering
-    rendering --> screens
-    guide -- "definiert" --> ledswitch
-    guide --> domain
-    guide --> screens
-    screens --> domain
-```
-
-**Dependency Inversion bei den LEDs:** `guide.py` muss LEDs schalten, kennt
-MQTT aber nicht. Es legt nur fest, was es braucht: das Protocol `LedSwitch`
-mit einer Methode `switch(contact, on)`. `mqtt_gateway.py` erfüllt dieses
-Protocol (gestrichelter Pfeil), ohne `guide.py` zu importieren. Im Test steht
-an derselben Stelle ein einfacher Rekorder, der sich die Aufrufe merkt.
-
-### Ablauf zur Laufzeit
-
-Zwei Threads arbeiten gleichzeitig (`par`): paho empfängt Nachrichten in
-seinem eigenen Netzwerk-Thread, der Haupt-Thread taktet das Blinken und
-zeichnet das Schild. Beide treffen sich im `ParkingGuide`, den ein Lock
-schützt. Das Beispiel: Platz P1 wird frei, dann fährt ein Auto ein.
-
-```mermaid
-sequenceDiagram
-    participant BMA as BMA<br/>curiosity
-    box paho-Netzwerk-Thread
-        participant GW as mqtt_gateway
-        participant EV as events<br/>EventDispatcher
-    end
-    participant G as ParkingGuide<br/>(mit Lock)
-    box Haupt-Thread
-        participant S as main_loop
-    end
-    participant TFT as TFT-Schild
-    participant BMC as BMA<br/>bmc-interface
-
-    par Eingang
-        BMA->>GW: regionOfInterestEvent P1 vacant<br/>(bma/events)
-        GW->>EV: handle_payload(payload)
-        alt ungültiges Event
-            EV->>EV: loggen und verwerfen
-        else gültig
-            EV->>G: on_space_state("P1", occupied=False)
-            opt Zustand von P1 hat sich geändert
-                G->>GW: switch(1, on=False)
-                GW->>BMC: LED-Befehl<br/>(bmc_interface/tirol-hackathon/out)
-            end
-        end
-        BMA->>GW: crossingLineEvent Einfahrt, in
-        GW->>EV: handle_payload(payload)
-        EV->>G: on_vehicle_entered(now)
-    and Hauptschleife
-        loop alle 0,1 s
-            S->>G: tick(now)
-            opt Blink-Phase der empfohlenen LED wechselt
-                G->>GW: switch(1, on=True/False)
-                GW->>BMC: LED-Befehl
-            end
-            opt Schild eingeschaltet
-                S->>G: screen(now)
-                G-->>S: Guidance(RIGHT, free=1)
-                S->>TFT: display(render(screen)), nur bei Änderung
-            end
-        end
-    end
-```
-
-- **Lock:** Ohne ihn könnte der Haupt-Thread die Belegung lesen, während der
-  Netzwerk-Thread sie gerade ändert. Der LED-Befehl wird erst nach dem Lock
-  gesendet, damit eine langsame Verbindung das Schild nicht aufhält.
-- **Zeit als Parameter:** `guide.screen(now)` bekommt die Uhrzeit übergeben.
-  Tests prüfen so „Pfeil verschwindet nach 10 s“, ohne 10 s zu warten.
-- **Nur bei Änderung:** LEDs werden nur bei einem Zustandswechsel geschaltet,
-  das Schild nur bei einer anderen Anzeige neu gezeichnet.
-
-### Die Dateien
+Fünf Dateien in [`src/parkleitsystem/`](src/parkleitsystem). Zum Lesen am
+besten in dieser Reihenfolge:
 
 | Datei | Aufgabe |
 | --- | --- |
-| `domain.py` | Parkplätze, Belegung, Seite mit den meisten freien Plätzen |
-| `screens.py` | die drei möglichen Anzeigen: `FreeSpaces`, `Guidance`, `NoSpace` |
-| `guide.py` | reagiert auf Zonen und Einfahrten, schaltet LEDs, entscheidet die Anzeige |
-| `events.py` | BMA-Events (über `detection_worker`) an den `guide` weiterreichen |
-| `rendering.py` | Anzeige als 160 × 128-Bild zeichnen (Pillow) |
-| `main_loop.py` | Hauptschleife: Blinken takten, Schild (falls vorhanden) aktualisieren |
-| `sign.py` | Schild: neu zeichnen, wenn sich die Anzeige ändert |
-| `led_command.py` | LED-Befehl im Format von [doc/leds-per-mqtt.md](../doc/leds-per-mqtt.md) |
-| `mqtt_gateway.py` | eine MQTT-Verbindung: Events abonnieren, LED-Befehle senden |
-| `config.py` | `config.toml` lesen und prüfen |
-| `cli.py` | alles verbinden und starten |
+| [`parking.py`](src/parkleitsystem/parking.py) | **Die Logik:** Belegung, LEDs, Empfehlung, Blinken, was das Schild zeigt. Kein MQTT, keine Hardware. |
+| [`mqtt_link.py`](src/parkleitsystem/mqtt_link.py) | Verbindung zum Broker: BMA-Events rein, LED-Befehle raus |
+| [`main.py`](src/parkleitsystem/main.py) | Start: alles verbinden, Hauptschleife |
+| [`config.py`](src/parkleitsystem/config.py) | `config.toml` lesen und prüfen |
+| [`sign.py`](src/parkleitsystem/sign.py) | Schild zeichnen (nur mit TFT) |
 
-Bausteine aus dem Hauptprojekt: `detection_worker` (Events lesen und verteilen)
-und `tft_display` (Bildschirm).
+Aus dem Hauptprojekt kommen `bmc_leds` (LED-Befehl bauen, auch für eure
+eigenen Programme), `detection_worker` (Events lesen) und `tft_display`
+(Bildschirm).
+
+```mermaid
+flowchart LR
+    main["main.py"] --> link["mqtt_link.py"]
+    main --> sign["sign.py"]
+    main --> config["config.py"]
+    link --> parking["parking.py"]
+    sign --> parking
+    config --> parking
+```
+
+Alle Pfeile zeigen auf `parking.py`, keiner von dort weg: Die Logik kennt
+weder MQTT noch Bildschirm. Deshalb lässt sie sich ohne Broker und ohne
+Hardware testen (`tests/test_parking.py`).
+
+Das geht so:
+
+- **LEDs ohne MQTT:** `CarPark` bekommt beim Erstellen „irgendetwas mit einer
+  Methode `switch(led, on)`“ (das Protocol `Leds`). Im Programm ist das
+  `MqttLink`, im Test ein Rekorder, der sich die Aufrufe merkt.
+- **Zeit als Parameter:** `tick(now=…)` und `screen(now=…)` bekommen die
+  Uhrzeit übergeben. Tests prüfen so „blinkt alle 0,5 s“ und „hört nach 10 s
+  auf“, ohne zu warten.
+- **Zwei Threads, ein Lock:** paho empfängt Nachrichten in seinem eigenen
+  Thread, die Hauptschleife ruft alle 0,1 s `tick` auf. Der Lock in `CarPark`
+  verhindert, dass beide gleichzeitig die Belegung ändern. LED-Befehle werden
+  erst nach dem Lock gesendet, damit eine langsame Verbindung nichts aufhält.
 
 ## Entwickeln
 

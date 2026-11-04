@@ -30,7 +30,7 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/tirol_hackathon_bernard_gruppe", "src/detection_worker", "src/picture_pipeline", "src/tft_display"]
+packages = ["src/bmc_leds", "src/tirol_hackathon_bernard_gruppe", "src/detection_worker", "src/picture_pipeline", "src/tft_display"]
 
 [tool.pytest.ini_options]
 # Musterloesung/ is a separate uv project with its own tests and venv.

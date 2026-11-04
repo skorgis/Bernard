@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-parkleitsystem = "parkleitsystem.cli:main"
+parkleitsystem = "parkleitsystem.main:main"
 
 [project.optional-dependencies]
 # Drivers for the real TFT (spidev, gpiod): only installable on the Pi.

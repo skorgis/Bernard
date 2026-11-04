@@ -1,4 +1,4 @@
-"""Command line entry point: wire configuration, MQTT, guide and sign."""
+"""Start the parking guidance system: `uv run parkleitsystem`."""
 
 import argparse
 import logging
@@ -6,37 +6,51 @@ import os
 import signal
 import sys
 import threading
+import time
+from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
+from typing import Protocol
 
-from detection_worker.dispatch import EventDispatcher
 from pydantic import ValidationError
 from tft_display import Display, PngPreview, TftConfig, open_tft
 
-from parkleitsystem.config import AppConfig, DisplaySettings, load_config
-from parkleitsystem.domain import ParkingLot
-from parkleitsystem.events import register_handlers
-from parkleitsystem.guide import ParkingGuide
-from parkleitsystem.main_loop import run_main_loop
-from parkleitsystem.mqtt_gateway import MqttGateway
+from parkleitsystem.config import Config, DisplaySettings, load_config
+from parkleitsystem.mqtt_link import MqttLink
+from parkleitsystem.parking import CarPark, Screen
 from parkleitsystem.sign import Sign
 
 logger = logging.getLogger(__name__)
 
+# One round of the main loop, in seconds: well below the 0.5 s blink
+# rhythm, so the blinking looks steady, and still no noticeable CPU load.
+LOOP_S = 0.1
 EXIT_CONFIG_ERROR = 2
 
 
+class ScreenSink(Protocol):
+    """Anything that shows the car park's screen, e.g. the `Sign`."""
+
+    def show(self, screen: Screen) -> None:
+        """Show `screen`."""
+        ...
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Run the parking guidance system until Ctrl+C or SIGTERM."""
+    """Run until Ctrl+C or SIGTERM (`docker stop`)."""
     args = _parse_args(argv)
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    username = os.environ.get("MQTT_USER")
+    password = os.environ.get("MQTT_PASSWORD")
+    if not username or not password:
+        logger.error("set MQTT_USER and MQTT_PASSWORD (broker login)")
+        return EXIT_CONFIG_ERROR
     try:
         config = load_config(args.config)
-        username, password = _credentials()
-    except (OSError, ValidationError, _MissingCredentialsError) as err:
+    except (OSError, ValidationError) as err:
         logger.error("%s", err)
         return EXIT_CONFIG_ERROR
     run(config, username=username, password=password, preview=args.preview)
@@ -44,44 +58,52 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def run(
-    config: AppConfig, *, username: str, password: str, preview: Path | None
+    config: Config, *, username: str, password: str, preview: Path | None
 ) -> None:
-    """Connect everything and drive the sign until a stop signal."""
-    dispatcher = EventDispatcher()
-    gateway = MqttGateway(
-        config.mqtt,
-        config.leds,
-        dispatcher,
-        username=username,
-        password=password,
-    )
-    guide = ParkingGuide(
-        ParkingLot(config.parking_spaces()),
-        gateway,
+    """Connect MQTT, car park and (optional) sign, then loop until stopped."""
+    link = MqttLink(config, username=username, password=password)
+    car_park = CarPark(
+        config.parking_spaces(),
+        link,
         guidance_s=config.entry.guidance_seconds,
-        lit_when_free=config.leds.lit_when == "free",
     )
-    register_handlers(
-        dispatcher,
-        topic=config.mqtt.event_topic,
-        entry=config.entry,
-        space_names=[space.roi_name for space in config.spaces],
-        guide=guide,
-    )
+    link.forward_events_to(car_park)
+
     stop = threading.Event()
     signal.signal(signal.SIGTERM, lambda _signum, _frame: stop.set())
-    with _open_sign(config.display, preview) as display, gateway:
+    with _open_display(config.display, preview) as display, link:
         sign = Sign(display) if display is not None else None
         try:
-            run_main_loop(guide, sign, wait=stop.wait)
+            run_loop(car_park, sign, wait=stop.wait)
         except KeyboardInterrupt:
             logger.info("stopped")
 
 
-def _open_sign(
+def run_loop(
+    car_park: CarPark,
+    sign: ScreenSink | None,
+    *,
+    wait: Callable[[float], bool],
+    clock: Callable[[], float] = time.monotonic,
+) -> None:
+    """Let the LED blink and update the sign until `wait` returns True.
+
+    `wait(timeout)` blocks up to `timeout` seconds and returns True to stop,
+    e.g. `threading.Event().wait`.
+    """
+    while True:
+        now = clock()
+        car_park.tick(now=now)
+        if sign is not None:
+            sign.show(car_park.screen(now=now))
+        if wait(LOOP_S):
+            return
+
+
+def _open_display(
     settings: DisplaySettings, preview: Path | None
 ) -> AbstractContextManager[Display | None]:
-    """Open the TFT, the PNG preview, or nothing if no sign is installed."""
+    """The TFT, a PNG file instead (--preview), or None without a sign."""
     tft = TftConfig(
         rotation=settings.rotation,
         x_offset=settings.x_offset,
@@ -97,24 +119,9 @@ def _open_sign(
     return open_tft(tft)
 
 
-class _MissingCredentialsError(Exception):
-    """MQTT_USER or MQTT_PASSWORD is not set."""
-
-
-def _credentials() -> tuple[str, str]:
-    username = os.environ.get("MQTT_USER")
-    password = os.environ.get("MQTT_PASSWORD")
-    if not username or not password:
-        raise _MissingCredentialsError(
-            "set MQTT_USER and MQTT_PASSWORD (broker login from the "
-            "supervisors)"
-        )
-    return username, password
-
-
 def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Parking guidance: arrow on the TFT, one LED per space."
+        description="Parking guidance: one LED per space, optional sign."
     )
     parser.add_argument(
         "--config",
