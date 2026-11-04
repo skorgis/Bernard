@@ -77,7 +77,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 ### 2. Projekt holen und einrichten
 
 ```bash
-git clone <TODO: Repository-URL>
+git clone https://github.com/bernard-technologies/Tirol-Hackathon.git
 cd Tirol-Hackathon
 uv sync
 ```
@@ -88,18 +88,33 @@ alles, was das Projekt braucht. Danach startet ihr Python-Programme immer mit
 
 ### 3. Prüfen, ob Events ankommen
 
-Bevor ihr programmiert, schaut euch an, was der BMA überhaupt verschickt. Auf
-dem Raspberry Pi ist der Mosquitto-Client installiert:
+Bevor ihr programmiert, schaut euch an, was der BMA überhaupt verschickt. Der
+Broker läuft auf dem Raspberry Pi (`hackathon.local`) und lässt nur
+angemeldete Programme zu. Benutzername und Passwort bekommt ihr von den
+Betreuern. Setzt sie als Umgebungsvariablen, dann müsst ihr sie nirgends
+hineinschreiben:
 
 ```bash
-mosquitto_sub -h <TODO: Hostname/IP des Pi> -t '<TODO: Topic>' -v
+export MQTT_HOST=hackathon.local
+export MQTT_USER=<Benutzer>
+export MQTT_PASSWORD=<Passwort>
 ```
 
-Schiebt ein Auto über den Parkplatz. Ihr solltet JSON-Nachrichten sehen. Mit
-`-t '#'` seht ihr alle Topics auf einmal.
+Dann hört ihr mit dem Mosquitto-Client mit:
 
-> **Tipp:** Kopiert euch eine echte Nachricht in eine Datei. Damit könnt ihr
-> euren Code später auch ohne laufenden BMA testen (siehe
+```bash
+mosquitto_sub -h "$MQTT_HOST" -u "$MQTT_USER" -P "$MQTT_PASSWORD" \
+  -t 'bma/events' -v
+```
+
+Schiebt ein Auto über den Parkplatz. Bei jeder Bewegung sollte eine Nachricht
+ankommen. Der BMA verschickt sie **komprimiert**, deshalb seht ihr im Terminal
+nur Zeichensalat. Das ist in Ordnung: Euer Python-Programm entpackt die
+Nachrichten automatisch (`parse_event`). Mit `-t '#'` seht ihr alle Topics auf
+einmal.
+
+> **Tipp:** Lesbare Beispiel-Nachrichten liegen in `Musterloesung/testdaten/`.
+> Damit könnt ihr euren Code auch ohne laufenden BMA testen (siehe
 > [Ohne BMA testen](#ohne-bma-testen)).
 
 ### 4. Euer erstes Programm
@@ -119,7 +134,7 @@ from detection_worker.data import Event, RegionOfInterestEvent, parse_event
 from detection_worker.dispatch import EventDispatcher, HandlerKey
 from detection_worker.transport.client import Client, MqttConfig
 
-TOPIC = "<TODO: Topic>"
+TOPIC = "bma/events"
 
 logging.basicConfig(level=logging.INFO)
 
@@ -136,7 +151,7 @@ dispatcher.add_handler(
 
 client = Client(
     MqttConfig(
-        broker_host=os.environ.get("MQTT_HOST", "<TODO: Hostname/IP des Pi>"),
+        broker_host=os.environ.get("MQTT_HOST", "hackathon.local"),
         broker_port=1883,
         client_id="team-<euer-teamname>",
         broker_username=os.environ.get("MQTT_USER"),
@@ -171,14 +186,9 @@ Beenden mit **Strg+C**.
 > derselben ID werfen sich gegenseitig vom Broker.
 
 > **Zugangsdaten:** Benutzername und Passwort für den Broker gehören nie in
-> den Code und nie in Git. Setzt sie als Umgebungsvariablen, bevor ihr das
-> Programm startet:
->
-> ```bash
-> export MQTT_HOST=<Hostname/IP des Pi>
-> export MQTT_USER=<Benutzer>
-> export MQTT_PASSWORD=<Passwort>
-> ```
+> den Code und nie in Git. Das Programm liest sie aus den Umgebungsvariablen
+> aus Schritt 3. In einem neuen Terminal müsst ihr die `export`-Befehle
+> erneut ausführen.
 
 ## Die BMA-Events verstehen
 
@@ -215,7 +225,7 @@ def on_entry(event: Event, line: CrossingLineEvent) -> None:
 
 
 dispatcher.add_handler(
-    HandlerKey(TOPIC, "<TODO: Name der Einfahrt-Linie>", CrossingLineEvent),
+    HandlerKey(TOPIC, "Einfahrt", CrossingLineEvent),
     on_entry,
 )
 ```
@@ -385,24 +395,25 @@ Mehr dazu in [src/picture_pipeline/README.md](src/picture_pipeline/README.md).
 
 ## Ohne BMA testen
 
-Ihr müsst nicht warten, bis ein Auto über den Parkplatz geschoben wird. Wenn
-ihr eine Nachricht aus Schritt 3 als `beispiel.json` gespeichert habt, könnt
-ihr eure Funktionen direkt damit aufrufen:
+Ihr müsst nicht warten, bis ein Auto über den Parkplatz geschoben wird. In
+`Musterloesung/testdaten/` liegen echte Nachrichten: `p1-belegt.json`,
+`p1-frei.json` und `einfahrt.json`. Damit könnt ihr eure Funktionen direkt
+aufrufen:
 
 ```python
 from pathlib import Path
 
 from detection_worker.data import parse_event
 
-event = parse_event(Path("beispiel.json").read_text())
+event = parse_event(Path("Musterloesung/testdaten/p1-belegt.json").read_text())
 dispatcher.dispatch(TOPIC, event)
 ```
 
 Oder ihr schickt die Nachricht selbst an den Broker, als käme sie vom BMA:
 
 ```bash
-mosquitto_pub -h <TODO: Hostname/IP des Pi> -t '<TODO: Topic>' \
-  -f beispiel.json
+mosquitto_pub -h "$MQTT_HOST" -u "$MQTT_USER" -P "$MQTT_PASSWORD" \
+  -t 'bma/events' -f Musterloesung/testdaten/p1-belegt.json
 ```
 
 ## Hilfe, es geht nicht!

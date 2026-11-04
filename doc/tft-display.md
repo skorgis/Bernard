@@ -4,9 +4,10 @@ Das Schild an der Einfahrt ist ein kleiner Farbbildschirm, der **Joy-IT
 RB-TFT1.8**. Er hängt direkt am Raspberry Pi. Euer Programm zeichnet ein Bild
 (zum Beispiel einen Pfeil) und schickt es auf den Bildschirm.
 
-<!-- TODO: verify wiring, rotation, offsets and colour order on the real
-     panel once SPI is enabled on the hackathon Pi, then update the
-     defaults below. -->
+> **Hinweis:** Die Werte unten (Verkabelung, Drehung, Versatz, Farbreihenfolge)
+> stammen aus der Anleitung des Herstellers und sind am Hackathon-Pi noch nicht
+> mit dem echten Bildschirm getestet. Sind Bild oder Farben verschoben oder
+> vertauscht, passt `rotation`, `x_offset`/`y_offset` oder `bgr` an.
 
 | Eigenschaft | Wert |
 | --- | --- |
