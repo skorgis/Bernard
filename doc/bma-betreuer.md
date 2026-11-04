@@ -1,12 +1,13 @@
 # BMA-Anleitung für Betreuer
 
-Stand: 16.10.2026
+Stand: 04.11.2026
 
 Diese Anleitung ist für das **Betreuer-Team**, nicht für die Teilnehmenden.
 Sie beschreibt, wie ihr den BMAv3 **G-A2610-0007** per LAN-Kabel erreicht und
 sein Kamerabild auf einen Test-PC holt. Die Teilnehmenden arbeiten nur mit den
 MQTT-Events (siehe [README](../README.md)) und greifen nie direkt auf den BMA
-zu.
+zu; das Kamerabild bekommen sie über einen Relay auf dem Raspberry Pi
+(Schritt 4).
 
 > **Hinweis:** Diese Datei liegt im selben Repository, das die Teilnehmenden
 > klonen. Gerätepasswörter und andere Zugangsdaten gehören deshalb nie hier
@@ -266,8 +267,23 @@ cat /etc/openvpn/inst1_status.txt | grep G-A2610-0007
 LAN-Adresse starten:
 
 ```bash
-~/camera_stream/camera_stream --listen 169.254.42.1:8080
+~/camera_stream/camera_stream --listen 169.254.42.1:8080 \
+--lowres-endpoint tcp://172.18.0.4:5556
 ```
+
+csicamera stellt das Video nicht mehr unter dem Standard-Endpunkt von
+camera_stream bereit (`/run/camera/zmq_lowres.ipc` fehlt, festgestellt am
+04.11.2026), sondern per TCP auf Port 5556 im eigenen Docker-Netz. Deshalb
+camera_stream immer mit `--lowres-endpoint` starten. Die IP von csicamera
+ändert sich, wenn der Container neu erstellt wird; so nachschlagen:
+
+```bash
+docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
+csicamera
+```
+
+Am 04.11.2026 war es `172.18.0.4`. Ohne `--lowres-endpoint` meldet
+camera_stream nach 30 s „Connect timed out“ und liefert kein Bild.
 
 Es läuft im Vordergrund und zeigt seine Logs. `Strg+C` oder das Schließen der
 ssh-Sitzung beendet es. Über VPN und LTE ist es so nicht erreichbar.
@@ -315,7 +331,8 @@ LTE auf den PC. Kostet ca. 1,8 GB LTE-Volumen pro Stunde Zuschauen.
 Auf dem BMA (VPN-Sitzung):
 
 ```bash
-~/camera_stream/camera_stream --listen 127.0.0.1:8080
+~/camera_stream/camera_stream --listen 127.0.0.1:8080 \
+--lowres-endpoint tcp://172.18.0.4:5556
 ```
 
 Auf dem PC, zweites Terminal, im Ordner des Repositorys camera_stream (öffnet
@@ -333,6 +350,54 @@ Auf dem PC, drittes Terminal:
 ```bash
 ffplay -fflags nobuffer -flags low_delay http://127.0.0.1:18080/stream.ts
 ```
+
+## Schritt 4: Kamerabild für die Teilnehmenden (über den Pi)
+
+Die Teilnehmenden sind im WLAN und erreichen den BMA nicht. Ein Relay auf dem
+Raspberry Pi ([`deploy/camera-relay`](../deploy/camera-relay/docker-compose.yml))
+nimmt ihre Verbindungen auf `hackathon.local:8080` an und reicht sie über das
+LAN-Kabel an camera_stream auf dem BMA weiter. Die Anleitung für die
+Teilnehmenden steht im [README](../README.md#das-kamerabild-ansehen).
+
+```
+ Laptop (WLAN) ── hackathon.local:8080 ──► Pi: camera-relay (socat)
+                                             │ LAN-Kabel
+                                             ▼
+                              BMA: camera_stream 169.254.42.1:8080
+```
+
+1. Auf dem BMA Port 8080 auf `eth0` freigeben, Variante **„Nur 8080“** aus
+   Schritt 2.7. Port 22 bleibt gesperrt. Die Regel gilt bis zum Neustart des
+   BMA, danach erneut setzen. Ohne Regel laufen Verbindungen vom Pi in einen
+   Timeout (geprüft am 04.11.2026).
+2. Auf dem BMA camera_stream auf der LAN-Adresse starten, wie in Schritt 3.
+   Die ssh-Sitzung muss offen bleiben, solange die Teilnehmenden zuschauen:
+   Mit ihr endet auch camera_stream (`nohup`/`setsid` überleben das Ende der
+   Sitzung auf dem BMA nicht).
+3. Der Relay läuft auf dem Pi dauerhaft (`restart: unless-stopped`).
+   Eingerichtet am 04.11.2026; neu einrichten vom Laptop aus, im
+   Repository-Root:
+
+```bash
+rsync -a --relative -e 'ssh -i ~/.ssh/id_rsa -o IdentitiesOnly=yes' \
+./deploy/camera-relay pi@hackathon.local:tirol-hackathon/
+```
+
+```bash
+ssh -i ~/.ssh/id_rsa -o IdentitiesOnly=yes pi@hackathon.local \
+'cd ~/tirol-hackathon/deploy/camera-relay && docker compose up -d'
+```
+
+4. Prüfen, von einem Laptop im WLAN:
+
+```bash
+ffplay -fflags nobuffer -flags low_delay http://hackathon.local:8080/stream.ts
+```
+
+Das LTE-Volumen ist nicht betroffen: Der Weg läuft nur über WLAN und Kabel.
+Jeder Zuschauer zieht ca. 4 Mbit/s über das WLAN des Pi (nicht gemessen,
+wie viele gleichzeitig gehen); bei ruckelndem Bild die Zahl der Zuschauer
+begrenzen.
 
 ## Stoppen und aufräumen
 
@@ -355,6 +420,21 @@ pgrep -a camera_stream || echo stopped
 ```bash
 sudo iptables -D INPUT -i eth0 -s 169.254.0.0/16 -p tcp \
 -m multiport --dports 22,8080 -m conntrack --ctstate NEW -j ACCEPT
+```
+
+Variante „Nur 8080“:
+
+```bash
+sudo iptables -D INPUT -i eth0 -s 169.254.0.0/16 -p tcp --dport 8080 \
+-m conntrack --ctstate NEW -j ACCEPT
+```
+
+Den Relay auf dem Pi stoppen, falls die Teilnehmenden kein Bild mehr
+bekommen sollen:
+
+```bash
+ssh -i ~/.ssh/id_rsa -o IdentitiesOnly=yes pi@hackathon.local \
+'cd ~/tirol-hackathon/deploy/camera-relay && docker compose down'
 ```
 
 4. Am Test-PC die LAN-Adresse wieder entfernen (oder einfach den Adapter
@@ -385,7 +465,8 @@ Die häufigste Ursache ist das falsche Gerät: Immer zuerst den Prompt prüfen.
 | Ping geht, ssh oder Stream über LAN laufen in Timeout | Firewall des BMA lässt auf `eth0` nur Port 80 durch | Schritt 2.7 (iptables-Freigabe) |
 | `ping` ohne Antwort, PC-Adresse stimmt | Kein Link, Kabel am falschen Gerät | Auf dem BMA: `cat /sys/class/net/eth0/carrier` muss `1` sein |
 | `nmcli` zeigt bei `eth0` „getting IP configuration“ | BMA sucht per DHCP, am PC gibt es keinen DHCP-Server | Harmlos, die feste `169.254.42.1` gilt trotzdem |
-| camera_stream meldet „Permission denied“ für `/run/camera/zmq_lowres.ipc` | User `bernard` darf den Socket von csicamera nicht lesen | Ausgabe sichern; noch ungetestet, Lösung offen |
+| camera_stream meldet „Connect timed out after 30s“ für `/run/camera/zmq_lowres.ipc` | csicamera bietet das Video nur noch per TCP an | Mit `--lowres-endpoint tcp://<csicamera-IP>:5556` starten (Schritt 3) |
+| Teilnehmende: Stream unter `hackathon.local:8080` bricht nach ~5 s ohne Bild ab | Firewall-Freigabe für 8080 fehlt (z. B. nach Neustart des BMA) oder camera_stream läuft nicht | Schritt 4.1 und 4.2 |
 | Port 8080 offen, Stream lädt nicht | camera_stream läuft nicht oder lauscht auf einer anderen Adresse | `pgrep -a camera_stream` prüfen, Logs in der ssh-Sitzung lesen |
 | Port 80 antwortet, ist aber nicht der Stream | Dort läuft die Admin-Seite des BMA | Port 80 nicht für camera_stream verwenden |
 | Bild kommt erst nach ~2 s | Client wartet auf den nächsten Keyframe | Normal |
@@ -409,10 +490,10 @@ Die häufigste Ursache ist das falsche Gerät: Immer zuerst den Prompt prüfen.
 | MPEG-TS | Containerformat für Live-Video mit Zeitstempeln; Player können jederzeit einsteigen. |
 | Keyframe (IDR) | Vollständiges Bild, ab dem ein Decoder starten kann. csicamera sendet alle 60 Bilder (2 s) eins. |
 
-## Ausblick: Kamerabild für Teilnehmende
+## Ausblick: Kamerabild ohne Kabel und Pi
 
-Teilnehmende sollen nie direkt auf den BMA, sondern nur über einen Server mit
-Token. Geplant, noch nicht umgesetzt:
+Vor Ort löst der Relay auf dem Pi das (Schritt 4). Ohne Kabel und Pi, also
+über LTE, bräuchte es einen Server mit Token. Geplant, noch nicht umgesetzt:
 
 1. Der BMA baut über LTE einen ausgehenden SSH-Reverse-Tunnel zum Server auf
    (`ssh -N -R 8080:127.0.0.1:8080`), authentifiziert per SSH-Key.

@@ -41,12 +41,13 @@ Rollstuhl-Kennzeichen, und leitet diese Autos zu einem Behindertenparkplatz.
 
 ## Was ist schon fertig?
 
-Ihr müsst nicht bei null anfangen. Dieses Repository enthält drei fertige
+Ihr müsst nicht bei null anfangen. Dieses Repository enthält vier fertige
 Bausteine:
 
 | Baustein | Wofür? | Doku |
 | --- | --- | --- |
 | `detection_worker` | Verbindet sich mit dem MQTT-Broker, liest die BMA-Events und wandelt sie in Python-Objekte um. Ihr könnt Funktionen registrieren, die bei bestimmten Events aufgerufen werden. | [src/detection_worker/README.md](src/detection_worker/README.md) |
+| `bmc_leds` | Baut den MQTT-Befehl, der eine LED am Parkplatz an- oder ausschaltet (`led_command`). Ihr müsst ihn nur noch senden. | [doc/leds-per-mqtt.md](doc/leds-per-mqtt.md) |
 | `tft_display` | Öffnet den TFT-Bildschirm am Pi; ihr zeichnet ein Bild mit Pillow und zeigt es mit einem Aufruf an. Ohne Bildschirm schreibt `PngPreview` das Bild in eine Datei. | [doc/tft-display.md](doc/tft-display.md) |
 | `picture_pipeline` | Findet bekannte Logos/Symbole in Kamerabildern, inklusive einer Oberfläche zum Ausprobieren und Einstellen. Für den Bonus. | [src/picture_pipeline/README.md](src/picture_pipeline/README.md) |
 
@@ -284,6 +285,65 @@ Schnelltest:
 uv run python examples/bmc_mqtt_switch.py --team team-1 --contact 3 --on
 ```
 
+Aus eurem Python-Programm, mit einem verbundenen paho-Client `client`:
+
+```python
+import json
+
+from bmc_leds import LED_TOPIC, led_command
+
+befehl = led_command(team="team-1", led=3, on=True)
+client.publish(LED_TOPIC, json.dumps(befehl), qos=1)
+```
+
+## Das Kamerabild ansehen
+
+Ihr könnt live sehen, was die Kamera des BMA sieht. Das Bild kommt über den
+Raspberry Pi, ihr müsst nur im Hackathon-WLAN sein:
+
+```
+http://hackathon.local:8080/stream.ts
+```
+
+Das erste Bild kann bis zu 2 Sekunden dauern.
+
+**VLC** (am einfachsten): Medien → Netzwerkstream öffnen → die Adresse oben
+eintragen → Wiedergabe.
+
+**ffplay** (kleinste Verzögerung, braucht ffmpeg):
+
+```bash
+ffplay -fflags nobuffer -flags low_delay http://hackathon.local:8080/stream.ts
+```
+
+**Python mit OpenCV** (ist im Projekt schon installiert), zum Beispiel um
+Bilder für den [Bonus](#bonus-symbole-erkennen) zu verwenden:
+
+```python
+import cv2
+
+cap = cv2.VideoCapture(
+    "http://hackathon.local:8080/stream.ts",
+    cv2.CAP_FFMPEG,
+    [cv2.CAP_PROP_N_THREADS, 1],
+)
+while True:
+    ok, frame = cap.read()
+    if not ok:
+        break
+    cv2.imshow("BMA", frame)
+    if cv2.waitKey(1) == ord("q"):
+        break
+cap.release()
+cv2.destroyAllWindows()
+```
+
+`CAP_PROP_N_THREADS, 1` ist wichtig: Sonst hält jeder Decoder-Thread ein Bild
+zurück und das Video hängt eine halbe Sekunde hinterher. Beenden mit `q`.
+
+Bitte schaltet den Stream ab, wenn ihr ihn nicht braucht: Jeder Zuschauer
+belastet das WLAN.
+
 ## Bonus: Symbole erkennen
 
 Mit `picture_pipeline` findet ihr Logos und Symbole im Bild einer Webcam.
@@ -354,6 +414,7 @@ mosquitto_pub -h <TODO: Hostname/IP des Pi> -t '<TODO: Topic>' \
 | Verbindung bricht ständig ab | Nutzt ein anderes Team dieselbe `client_id`? |
 | Keine Events | Mit `mosquitto_sub -t '#' -v` prüfen, auf welchem Topic die Events wirklich ankommen. |
 | Funktion wird nie aufgerufen | Stimmen Topic, Name und Event-Typ im `HandlerKey` mit den echten Nachrichten überein? Groß-/Kleinschreibung beachten. |
+| Kamerabild lädt nicht oder bricht nach ein paar Sekunden ab | Seid ihr im Hackathon-WLAN? Dann sagt uns Bescheid: Der Stream muss auf dem BMA gestartet sein. |
 | Mehr Details sehen | `logging.basicConfig(level=logging.DEBUG)` statt `INFO` setzen. |
 
 Und natürlich: **Fragt uns!** Wir sind den ganzen Hackathon über vor Ort.
